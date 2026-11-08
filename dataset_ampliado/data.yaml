@@ -1,7 +1,11 @@
-path: C:/Users/EVELYN/Desktop/detector_cascos_motos/dataset_ampliado
+
+# Dataset ampliado para deteccion de cascos y matriculas
+# Rutas relativas a la ubicacion de este archivo
+
 train: train/images
 val: valid/images
 test: test/images
+
 names:
   0: With Helmet
   1: Without Helmet
