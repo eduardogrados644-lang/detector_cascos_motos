@@ -1,0 +1,8 @@
+
+# Dependencias del detector de cascos y matriculas
+# Python 3.13 - Windows
+
+ultralytics==8.4.191
+opencv-python
+torch
+numpy
