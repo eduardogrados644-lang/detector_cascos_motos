@@ -1,0 +1,25 @@
+{
+  "modelo_origen": "resultados/entrenamientos/refinado_completo/weights/best.pt",
+  "indice_origen": "datos_videos_pendientes/lote_001/indice.csv",
+  "fotogramas_con_revision_individual": 85,
+  "total_fotogramas_indice": 320,
+  "videos_reservados": [
+    "With Helmet\\p15.mp4",
+    "With Helmet\\p16.mp4",
+    "Without Helmet\\p15.mp4",
+    "Without Helmet\\p16.mp4"
+  ],
+  "cuentas": {
+    "original_train": 1070,
+    "original_valid": 309,
+    "original_test": 154,
+    "fotogramas_video_entrenamiento": 85,
+    "fotogramas_rechazados_o_no_revisados": 195,
+    "fotogramas_reservados": 40
+  },
+  "cajas_por_clase": {
+    "With Helmet": 914,
+    "Without Helmet": 837,
+    "licence": 836
+  }
+}

@@ -1,0 +1,41 @@
+
+# Entornos virtuales
+.venv/
+venv/
+env/
+
+# Archivos temporales de Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# Cachés y archivos temporales
+*.cache
+*.tmp
+*.log
+*.lock
+
+# Configuración local del editor
+.vscode/
+
+# Archivos del sistema operativo
+Thumbs.db
+.DS_Store
+
+# Credenciales privadas
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+
+# Resultados temporales regenerables
+runs/
+
+# Capturas locales de personas para revisión
+resultados/capturas_camara/
+resultados/ejemplos_para_etiquetar/

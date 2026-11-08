@@ -1,0 +1,13 @@
+train: ../train/images
+val: ../valid/images
+test: ../test/images
+
+nc: 3
+names: ['With Helmet', 'Without Helmet', 'licence']
+
+roboflow:
+  workspace: bangla-license-plate-detection-by-yolov8
+  project: helmet-and-no-helmet-rider-detection-rvq9y-8dvnv
+  version: 1
+  license: CC BY 4.0
+  url: https://universe.roboflow.com/bangla-license-plate-detection-by-yolov8/helmet-and-no-helmet-rider-detection-rvq9y-8dvnv/dataset/1

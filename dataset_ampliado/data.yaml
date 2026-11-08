@@ -1,0 +1,8 @@
+path: C:/Users/EVELYN/Desktop/detector_cascos_motos/dataset_ampliado
+train: train/images
+val: valid/images
+test: test/images
+names:
+  0: With Helmet
+  1: Without Helmet
+  2: licence
