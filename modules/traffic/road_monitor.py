@@ -22,6 +22,7 @@ from .association import (
     relacionar,
 )
 from .vehicle_detector import ids_objetivo, resolver_fuente
+from modules.camera_sources import abrir_captura
 
 
 RAIZ = Path(__file__).resolve().parents[2]
@@ -144,10 +145,7 @@ def ejecutar(args) -> None:
             "El modelo de cascos no contiene las clases With/Without Helmet"
         )
 
-    captura = cv2.VideoCapture(fuente)
-    if not captura.isOpened():
-        captura.release()
-        raise OSError(f"No se pudo abrir la fuente: {args.fuente}")
+    captura = abrir_captura(fuente)
 
     salida = crear_salida(RAIZ / "resultados" / "vial_integrado")
     confirmar = ConfirmadorEventosViales(args.confirmaciones)

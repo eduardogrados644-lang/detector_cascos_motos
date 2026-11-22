@@ -31,7 +31,7 @@ No hemos eliminado ni sustituido estos scripts. Sus modelos .pt deben estar real
 ## Complemento de personas y motocicletas
 
     .\.venv\Scripts\python.exe -m modules.traffic.vehicle_detector prueba_motos.mp4 --guardar
-    .\.venv\Scripts\python.exe -m modules.traffic.vehicle_detector camara:0 --mostrar
+    .\.venv\Scripts\python.exe -m modules.traffic.vehicle_detector camara:1 --mostrar
 
 Busca las clases person y motorcycle usando pesos de detección COCO (yolo11n.pt). Los conteos son apariciones por fotograma, no personas o vehículos únicos, y todavía NO se relacionan con los cascos.
 
@@ -153,7 +153,7 @@ En Windows puedes abrir directamente **Iniciar_Cascos.bat** o **Iniciar_Intencio
 En la raíz hay **dos archivos para iniciar cada tema por separado**:
 
 - **Control vial (disponible para pruebas):** python iniciar_cascos.py
-  - Menú para video de ejemplo, cámara local o fuente personalizada.
+  - Menú para video de ejemplo, cámara **USB EXTERNA** elegida por índice, celular/tablet Android con **IP Webcam por Wi-Fi**, o archivo/URL.
   - Por defecto inicia el monitor con dos modelos viales separados:
     YOLO COCO para personas/motos y videos_revisados para cascos.
   - Comando no interactivo:
@@ -178,3 +178,46 @@ Para actualizar desde VS Code:
 
 El iniciador vial no está validado aún con todos los ángulos/cámaras:
 las detecciones siguen siendo candidatos a revisión, no sanciones.
+
+
+## Cámaras externas para ambos iniciadores: USB y celular/tablet
+
+**No se inicia automáticamente la cámara integrada**. Al abrir
+Iniciar_Cascos.bat o Iniciar_Intencion.bat aparece un menú de fuentes:
+
+1. Video de prueba incluido en el repositorio (sin usar ninguna cámara).
+2. Cámara USB externa conectada al PC (escribir el índice explícito, por
+   ejemplo 1). El índice depende de Windows y NO prueba físicamente que sea
+   externa: comprueba la vista y selecciona tu USB correcta.
+3. Celular o tablet **Android** mediante la aplicación IP Webcam por Wi-Fi.
+   Conecta ambos dispositivos a la misma red, inicia el servidor IP Webcam
+   en el móvil/tablet y escribe la URL que muestre la app. Por ejemplo:
+   http://192.168.1.50:8080 (ES SÓLO UN EJEMPLO, no es tu IP).
+   El programa añade /video si no hay ruta; admite un flujo MJPEG explícito.
+4. Archivo de video o URL RTSP/MJPEG compatible.
+
+Opciones sin menú, desde la raíz:
+
+    python iniciar_cascos.py --usb 1
+    python iniciar_cascos.py --wifi "http://192.168.1.50:8080"
+    python iniciar_cascos.py --fuente prueba_motos.mp4 --guardar-video
+
+    python iniciar_intencion.py --estado
+    python iniciar_intencion.py --demo-posturas --usb 1
+    python iniciar_intencion.py --demo-posturas --wifi "http://192.168.1.50:8080"
+
+El número de USB **nunca se deduce automáticamente**. Se bloquea el índice
+0 desde los iniciadores por seguridad contra selección accidental de la
+webcam integrada; algunos equipos asignan 0 a una USB externa, por lo que
+si ese es tu caso hay que identificar y ajustar el dispositivo expresamente.
+Si la cámara elegida falla, el programa NO cambia a otra.
+
+Para verificar el índice USB, conecta la cámara y consulta el Administrador
+de dispositivos de Windows en la sección Cámaras; los nombres allí no
+garantizan el número de índice OpenCV, así que verifica la vista antes de
+utilizar el sistema.
+
+Ambos apartados comparten **solo el lector de cámara**, no el modelo YOLO,
+datasets, reglas de clasificación ni los eventos. El apartado conductual
+continúa reservado a demostraciones de posturas hasta disponer de modelos
+especializados validados.

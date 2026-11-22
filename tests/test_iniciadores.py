@@ -17,7 +17,7 @@ class PruebasIniciadores(unittest.TestCase):
 
     def test_vial_pasa_opciones_de_video(self):
         comando = iniciar_cascos.construir_comando(
-            "camara:0", guardar_video=True, mostrar=False,
+            "camara:1", guardar_video=True, mostrar=False,
             stride=2, max_fotogramas=100,
         )
         self.assertIn("--guardar-video", comando)
@@ -43,12 +43,12 @@ class PruebasIniciadores(unittest.TestCase):
         with patch("iniciar_intencion.subprocess.run") as ejecutar:
             ejecutar.return_value.returncode = 0
             resultado = iniciar_intencion.main(
-                ["--demo-posturas", "--fuente", "0", "--sin-mostrar"]
+                ["--demo-posturas", "--fuente", "camara:1", "--sin-mostrar"]
             )
         self.assertEqual(resultado, 0)
         comando = ejecutar.call_args.args[0]
         self.assertNotIn("--mostrar", comando)
-        self.assertEqual(comando[-2:], ["--fuente", "0"])
+        self.assertEqual(comando[-2:], ["--fuente", "camara:1"])
 
     def test_validaciones_argumentos(self):
         with self.assertRaises(ValueError):

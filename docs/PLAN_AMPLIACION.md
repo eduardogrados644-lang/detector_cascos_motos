@@ -92,3 +92,15 @@ Pasar las pruebas unitarias, comprobar la descarga de Git LFS y ejecutar manualm
 - Nunca son dos proyectos o dos repositorios: sólo dos apartados.
 - No unir modelos o datos entre los apartados. Desarrollar el modelo
   especializado conductual antes de ofrecer detección real de armas/violencia.
+
+
+## Fuentes de video compartidas (sin unir las dos IA)
+
+- modules/camera_sources.py: menú de video, USB externa seleccionada por
+  índice y celular/tablet Android con URL IP Webcam /video.
+- Ambos iniciadores evitan seleccionar camara:0 y nunca hacen fallback
+  automático a la webcam integrada.
+- Los detectores reutilizan la apertura robusta de camara_zoom.py para USB
+  Windows y fuentes HTTP MJPEG; conservan sus modelos y reglas independientes.
+- Es necesario validar índices USB reales y conectividad LAN en Windows.
+- En la demostración conductual no se activan modelos de violencia o armas.

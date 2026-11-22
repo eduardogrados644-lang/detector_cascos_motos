@@ -12,6 +12,7 @@ import cv2
 from ultralytics import YOLO
 
 from .events import DetectorEventos, Persona
+from modules.camera_sources import abrir_captura
 
 
 RAIZ = Path(__file__).resolve().parents[2]
@@ -72,7 +73,7 @@ def main() -> None:
     parser = argparse.ArgumentParser(
         description="Análisis postural experimental, independiente de cascos"
     )
-    parser.add_argument("--fuente", default="0", help="0, camara:0, vídeo o RTSP")
+    parser.add_argument("--fuente", default="prueba_motos.mp4", help="video, camara:1 (USB externa), IP Webcam o RTSP")
     parser.add_argument("--modelo", default="yolo11n-pose.pt")
     parser.add_argument("--conf", type=float, default=0.45)
     parser.add_argument("--imgsz", type=int, default=320)
@@ -95,9 +96,7 @@ def main() -> None:
     modelo = YOLO(args.modelo)
     if getattr(modelo, "task", None) != "pose":
         raise ValueError("El modelo conductual debe ser de tipo pose, no detect")
-    camara = cv2.VideoCapture(fuente)
-    if not camara.isOpened():
-        raise OSError(f"No se pudo abrir la fuente de video: {args.fuente}")
+    camara = abrir_captura(fuente)
 
     destino = Path(args.csv).expanduser()
     destino.parent.mkdir(parents=True, exist_ok=True)

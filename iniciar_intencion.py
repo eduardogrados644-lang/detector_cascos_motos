@@ -9,6 +9,8 @@ import subprocess
 import sys
 from pathlib import Path
 
+from modules.camera_sources import seleccionar_fuente, validar_fuente
+
 
 RAIZ = Path(__file__).resolve().parent
 
@@ -23,7 +25,7 @@ def mostrar_estado() -> None:
 
 
 def construir_comando_demo(
-    fuente: str = "0",
+    fuente: str = "prueba_motos.mp4",
     mostrar: bool = True,
     guardar_video: bool = False,
     max_fotogramas: int = 0,
@@ -33,7 +35,7 @@ def construir_comando_demo(
         raise ValueError("Fuente o número de fotogramas inválidos")
     cmd = [
         sys.executable, "-m", "modules.behavioral.pose_detector",
-        "--fuente", fuente,
+        "--fuente", validar_fuente(fuente),
     ]
     if mostrar:
         cmd.append("--mostrar")
@@ -52,7 +54,14 @@ def main(argv: list[str] | None = None) -> int:
         "--demo-posturas", action="store_true",
         help="Ejecutar sólo la demostración actual de poses; NO detecta armas/violencia",
     )
-    parser.add_argument("--fuente", default="0")
+    fuentes = parser.add_mutually_exclusive_group()
+    fuentes.add_argument("--fuente", help="Archivo de video o URL RTSP/MJPEG")
+    fuentes.add_argument(
+        "--usb", type=int, help="Índice de cámara USB externa (1 a 20)"
+    )
+    fuentes.add_argument(
+        "--wifi", help="URL IP Webcam de celular/tablet Android"
+    )
     parser.add_argument("--max-fotogramas", type=int, default=0)
     parser.add_argument("--sin-mostrar", action="store_true")
     parser.add_argument("--guardar-video", action="store_true")
@@ -73,13 +82,20 @@ def main(argv: list[str] | None = None) -> int:
                 raise ValueError("Opción no válida")
             demo = True
         if demo:
+            fuente = seleccionar_fuente(args.fuente, args.usb, args.wifi)
+            if fuente is None:
+                print("Se canceló la selección de fuente conductual.")
+                return 0
             cmd = construir_comando_demo(
-                args.fuente,
+                fuente,
                 mostrar=not args.sin_mostrar,
                 guardar_video=args.guardar_video,
                 max_fotogramas=args.max_fotogramas,
             )
             print("\nIniciando sólo la prueba de posturas.")
+            print("Fuente seleccionada:", fuente)
+            if fuente.startswith("camara:"):
+                print("AVISO: verifica que el índice corresponda a la USB externa.")
             return subprocess.run(cmd, cwd=RAIZ, check=False).returncode
     except (EOFError, KeyboardInterrupt):
         print("\nOperación cancelada.")

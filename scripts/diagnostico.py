@@ -9,6 +9,7 @@ SCRIPTS = (
     "modules/traffic/vehicle_detector.py",
     "modules/traffic/road_monitor.py",
     "iniciar_cascos.py",
+    "modules/camera_sources.py",
     "iniciar_intencion.py",
     "modules/traffic/association.py",
     "modules/behavioral/pose_detector.py",

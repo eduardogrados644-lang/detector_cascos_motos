@@ -8,30 +8,11 @@ import subprocess
 import sys
 from pathlib import Path
 
+from modules.camera_sources import seleccionar_fuente, validar_fuente
+
 
 RAIZ = Path(__file__).resolve().parent
 MODELO_CASCOS = "resultados/entrenamientos/videos_revisados/weights/best.pt"
-
-
-def elegir_fuente() -> str | None:
-    print("\n=== CONTROL VIAL: CASCOS Y MOTOCICLETAS ===")
-    print("1. Video de prueba incluido (prueba_motos.mp4)")
-    print("2. Cámara local (camara:0)")
-    print("3. Escribir ruta de video o cámara IP")
-    print("0. Salir")
-    opcion = input("Opción: ").strip()
-    if opcion == "0":
-        return None
-    if opcion == "1":
-        return "prueba_motos.mp4"
-    if opcion == "2":
-        return "camara:0"
-    if opcion == "3":
-        ruta = input("Ruta/URL de la fuente: ").strip()
-        if not ruta:
-            raise ValueError("La fuente no puede estar vacía")
-        return ruta
-    raise ValueError(f"Opción no válida: {opcion}")
 
 
 def construir_comando(
@@ -48,9 +29,10 @@ def construir_comando(
         raise ValueError("Fuente y modelos obligatorios")
     if stride < 1 or max_fotogramas < 0:
         raise ValueError("stride o max_fotogramas inválidos")
+    fuente_validada = validar_fuente(fuente)
     comando = [
         sys.executable, "-m", "modules.traffic.road_monitor",
-        "--fuente", fuente,
+        "--fuente", fuente_validada,
         "--modelo-vehiculos", modelo_vehiculos,
         "--modelo-cascos", modelo_cascos,
         "--stride", str(stride),
@@ -68,7 +50,16 @@ def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(
         description="Iniciador del apartado vial: cascos, personas y motocicletas"
     )
-    parser.add_argument("--fuente", help="Video, camara:0 o URL")
+    fuentes = parser.add_mutually_exclusive_group()
+    fuentes.add_argument("--fuente", help="Video o URL de transmisión")
+    fuentes.add_argument(
+        "--usb", type=int,
+        help="Índice explícito de cámara USB EXTERNA (1 a 20); nunca se elige la integrada",
+    )
+    fuentes.add_argument(
+        "--wifi",
+        help="URL de IP Webcam en celular/tablet Android, ej. http://192.168.1.50:8080",
+    )
     parser.add_argument("--modelo-cascos", default=MODELO_CASCOS)
     parser.add_argument("--modelo-vehiculos", default="yolo11n.pt")
     parser.add_argument("--stride", type=int, default=3)
@@ -77,12 +68,12 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--sin-mostrar", action="store_true")
     args = parser.parse_args(argv)
     try:
-        fuente = args.fuente if args.fuente is not None else elegir_fuente()
+        fuente = seleccionar_fuente(args.fuente, args.usb, args.wifi)
         if fuente is None:
             print("Saliendo del apartado vial.")
             return 0
         guardar = args.guardar_video
-        if args.fuente is None and not guardar:
+        if args.fuente is None and args.usb is None and args.wifi is None and not guardar:
             guardar = input("¿Guardar video anotado? [s/N]: ").strip().lower() in (
                 "s", "si", "sí",
             )
@@ -96,6 +87,9 @@ def main(argv: list[str] | None = None) -> int:
             max_fotogramas=args.max_fotogramas,
         )
         print("\nIniciando apartado VIAL. Los resultados requieren revisión humana.")
+        print("Fuente solicitada:", fuente)
+        if fuente.startswith("camara:"):
+            print("AVISO: comprueba en la vista que el índice corresponda a la USB externa.")
         return subprocess.run(cmd, cwd=RAIZ, check=False).returncode
     except (EOFError, KeyboardInterrupt):
         print("\nOperación cancelada.")
