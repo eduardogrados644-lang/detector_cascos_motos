@@ -6,6 +6,7 @@ Cada aviso CSV es un CANDIDATO de revisión humana, nunca una multa automática.
 """
 import argparse
 import csv
+import json
 import math
 import time
 from collections import Counter
@@ -15,6 +16,7 @@ from pathlib import Path
 import cv2
 from ultralytics import YOLO
 
+from .coverage import resumen_cobertura
 from .association import (
     ConfirmadorEventosViales,
     Objeto,
@@ -349,6 +351,13 @@ def ejecutar(args) -> None:
     )
     print(f"CSV: {salida / 'eventos.csv'}")
     print(f"Revisiones de duplicados: {ruta_duplicados}")
+    cobertura = resumen_cobertura(paso, total)
+    ruta_cobertura = salida / "estado_cobertura.json"
+    with ruta_cobertura.open("w", encoding="utf-8") as archivo_cobertura:
+        json.dump(cobertura, archivo_cobertura, indent=2, ensure_ascii=False)
+    print(f"ESTADO DE COBERTURA VIAL: {cobertura['estado']}")
+    print(f"AVISO: {cobertura['detalle']}")
+    print(f"Informe de cobertura: {ruta_cobertura}"
 
 
 def main() -> None:

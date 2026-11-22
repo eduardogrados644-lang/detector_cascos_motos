@@ -253,3 +253,35 @@ Comprueba las nuevas cifras \`candidatos a revisar\` y
 \`posibles duplicados de seguimiento\`. Esperamos que el caso del segundo
 ID se revise como posible duplicado, pero la confirmación exige ejecutar
 YOLO en el Windows del proyecto y examinar el video anotado.
+
+
+## Validación de cobertura para videos recortados (p16 With/Without Helmet)
+
+Las pruebas reservadas p16 detectaron **1201 apariciones de casco** y
+**1208 de sin casco** respectivamente, pero ambas tuvieron **cero
+apariciones de motocicleta** en COCO y, por tanto, cero asociaciones.
+
+Esto **NO demuestra** que el monitor vial haya confirmado cumplimiento o
+ausencia de personas sin casco: sin moto no es posible evaluar asociaciones.
+Tampoco prueba que el modelo COCO falle: primero hay que comprobar si la
+moto aparece físicamente en el encuadre.
+
+El monitor ahora informa siempre el \`ESTADO DE COBERTURA VIAL\` y crea
+\`estado_cobertura.json\` dentro de la carpeta de cada sesión. Estados:
+
+- \`no_evaluable_sin_motocicletas\`: no hubo detección de motos.
+- \`no_evaluable_sin_asociaciones\`: hubo motos pero no asociaciones.
+- \`no_evaluable_sin_fotogramas\`: fuente sin fotogramas procesados.
+- \`asociaciones_experimentales_para_revision\`: hubo asociaciones,
+  pero ninguna confirma infracciones o identidades.
+
+**Diagnóstico breve de modelo COCO** (25 muestras, sin ejecutar el video
+entero de nuevo ni cambiar pesos/umbrales operativos):
+
+    python -m scripts.diagnostico_modelos --fuente "videos_prueba\Without Helmet\p16.mp4" --modelo yolo11n.pt
+    python -m scripts.diagnostico_modelos --fuente "videos_prueba\With Helmet\p16.mp4" --modelo yolo11n.pt
+
+Si continúa sin encontrar motos, revisar una captura del vídeo original
+o del \`anotado.mp4\` para comprobar el campo de visión antes de ajustar
+umbrales, entrenar un modelo nuevo o declarar cero infracciones.
+Los cuatro videos de prueba reservados no deben reintroducirse en entrenamiento.
