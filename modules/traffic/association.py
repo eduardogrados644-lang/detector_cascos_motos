@@ -39,7 +39,7 @@ def normalizar_clase(nombre: str) -> str:
     texto = normalize("NFKD", nombre).encode("ascii", "ignore").decode()
     texto = texto.lower().replace("_", " ").replace("-", " ").strip()
     texto = " ".join(texto.split())
-    if texto in ("without helmet", "no helmet", "sin casco"):
+    if texto in ("without helmet", "no helmet", "nohelmet", "sin casco"):
         return "sin_casco"
     if texto in ("with helmet", "helmet", "con casco"):
         return "con_casco"
@@ -47,7 +47,7 @@ def normalizar_clase(nombre: str) -> str:
         return "moto"
     if texto in ("person", "persona"):
         return "persona"
-    if texto in ("licence", "license plate", "placa", "matricula"):
+    if texto in ("licence", "license", "license plate", "numberplate", "number plate", "placa", "matricula"):
         return "placa"
     return "otro"
 

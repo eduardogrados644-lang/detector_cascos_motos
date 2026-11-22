@@ -22,6 +22,9 @@ class TestAsociacionVial(unittest.TestCase):
         self.assertEqual(normalizar_clase("motorcycle"), "moto")
         self.assertEqual(normalizar_clase("person"), "persona")
         self.assertEqual(normalizar_clase("licence"), "placa")
+        self.assertEqual(normalizar_clase("numberplate"), "placa")
+        self.assertEqual(normalizar_clase("number plate"), "placa")
+        self.assertEqual(normalizar_clase("nohelmet"), "sin_casco")
 
     def test_asocia_persona_moto_y_etiqueta_de_casco(self):
         relaciones = relacionar([MOTO], [PERSONA], [SIN_CASCO])

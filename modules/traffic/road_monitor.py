@@ -162,6 +162,8 @@ def ejecutar(args) -> None:
 
     print(f"Fuente: {args.fuente}")
     print(f"Pesos: {args.modelo_vehiculos} + {args.modelo_cascos}")
+    print(f"Clases viales: {modelo_vehiculos.names}")
+    print(f"Clases casco/placa: {modelo_cascos.names}")
     print("Solo se registran candidatos a revisar; no infracciones confirmadas.")
     print(f"Resultados: {salida}")
 
@@ -177,6 +179,8 @@ def ejecutar(args) -> None:
                 "evento", "estado",
             ])
             while True:
+                if args.max_fotogramas and numero >= args.max_fotogramas:
+                    break
                 ok, frame = captura.read()
                 if not ok:
                     break
@@ -226,6 +230,8 @@ def ejecutar(args) -> None:
                 total["motos"] += len(motos)
                 total["relaciones"] += len(relaciones)
                 total["candidatos"] += len(eventos)
+                total.update(f"deteccion_{objeto.clase}" for objeto in objetos_cascos)
+                total.update(f"asociacion_{relacion.estado}" for relacion in relaciones)
 
                 for evento in eventos:
                     escritor_csv.writerow([
@@ -271,8 +277,6 @@ def ejecutar(args) -> None:
                         f"Analizados {paso} frames; asociaciones "
                         f"{total['relaciones']}, candidatos {total['candidatos']}"
                     )
-                if args.max_fotogramas and numero >= args.max_fotogramas:
-                    break
     except KeyboardInterrupt:
         print("Proceso interrumpido.")
     finally:
@@ -289,6 +293,14 @@ def ejecutar(args) -> None:
         f"Apariciones persona/moto: {total['personas']}/{total['motos']}; "
         f"asociaciones: {total['relaciones']}; "
         f"candidatos a revisar: {total['candidatos']}"
+    )
+    print(
+        "Detecciones casco/placa por clase: "
+        + str({nombre: total[f"deteccion_{nombre}"] for nombre in sorted(CLASES_CASCO)})
+    )
+    print(
+        "Estados de asociaciones: "
+        + str({nombre: total[f"asociacion_{nombre}"] for nombre in ("con_casco", "sin_casco", "desconocido")})
     )
     print(f"CSV: {salida / 'eventos.csv'}")
 

@@ -75,3 +75,36 @@ Pruebas unitarias del apartado vial:
 Después de actualizar la rama, repite la batería completa:
 
     .\.venv\Scripts\python.exe -m unittest discover -s tests -v
+
+
+## Tercera entrega: diagnóstico de modelos y clases (antes de entrenar de nuevo)
+
+Si el monitor vial integrado no encuentra motos o cabezas, **no ajustes
+automáticamente las asociaciones ni declares ausencia de infracciones**.
+Primero identifica qué clases devuelve cada modelo y con qué confianza.
+
+Desde la raíz de tu proyecto, con el entorno Python activado:
+
+    python -m scripts.diagnostico_modelos --fuente prueba_motos.mp4
+
+Este comando compara sobre los **mismos fotogramas** los pesos originales
+best.pt, refinado_completo y videos_revisados. Usa confianza de diagnóstico
+0.10, por debajo del umbral operativo, y muestra las apariciones por clase
+y banda de confianza; las detecciones débiles NO son infracciones fiables.
+
+Para determinar por qué el modelo COCO no encuentra motos en un video
+reservado, compruébalo por separado:
+
+    python -m scripts.diagnostico_modelos --fuente "videos_prueba\Without Helmet\p15.mp4" --modelo yolo11n.pt
+
+Después puedes comparar el monitor integrado con los pesos refinados,
+conservando el modelo de vehículos independiente:
+
+    python -m modules.traffic.road_monitor --fuente prueba_motos.mp4 --modelo-cascos "resultados/entrenamientos/refinado_completo/weights/best.pt" --max-fotogramas 180 --guardar-video
+
+El monitor ahora muestra las clases reales y un resumen diferenciado
+de detecciones con casco, sin casco y placa, así como las asociaciones
+desconocidas. El nombre numberplate se normaliza a placa.
+
+No entrenes con videos reservados usados para evaluación. Si los pesos
+refinados no están descargados, ejecuta git lfs pull y vuelve a probar.
