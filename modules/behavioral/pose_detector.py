@@ -111,7 +111,7 @@ def main() -> None:
             fps = camara.get(cv2.CAP_PROP_FPS) or 20.0
             if anchura <= 0 or altura <= 0:
                 raise ValueError("La fuente de video no informa dimensiones válidas")
-            salida = destino.parent / "resultado_posturas.mp4"
+            salida = destino.parent / (\n                "resultado_posturas_"\n                + datetime.now(timezone.utc).strftime("%Y%m%d_%H%M%S_%f")\n                + ".mp4"\n            )
             escritor_video = cv2.VideoWriter(
                 str(salida),
                 cv2.VideoWriter_fourcc(*"mp4v"),
