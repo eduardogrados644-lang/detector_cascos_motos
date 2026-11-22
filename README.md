@@ -143,3 +143,35 @@ diferentes: la estabilidad de IDs se debe comprobar revisando el video.
 Verifica los modelos en los videos reservados With Helmet y Without Helmet.
 La aprobación del PR hacia main depende de comprobar resultados y falsos positivos
 en la computadora donde se ejecuta YOLO.
+
+
+## Iniciadores de los dos apartados (mismo repositorio)
+
+En la raíz hay **dos archivos para iniciar cada tema por separado**:
+
+- **Control vial (disponible para pruebas):** python iniciar_cascos.py
+  - Menú para video de ejemplo, cámara local o fuente personalizada.
+  - Por defecto inicia el monitor con dos modelos viales separados:
+    YOLO COCO para personas/motos y videos_revisados para cascos.
+  - Comando no interactivo:
+    python iniciar_cascos.py --fuente prueba_motos.mp4 --guardar-video
+- **Análisis conductual/intención (reservado y experimental):**
+  python iniciar_intencion.py
+  - Muestra el estado; aún NO detecta armas, violencia ni intenciones.
+  - Puede ejecutar únicamente la demo existente de poses (independiente):
+    python iniciar_intencion.py --demo-posturas --fuente prueba_motos.mp4
+  - Para consultar el estado sin abrir cámara:
+    python iniciar_intencion.py --estado
+
+Son dos puntos de entrada en **un solo repositorio**, sin crear ramas ni
+repositorios separados para cada uno. Los modelos, resultados y reglas de
+cada apartado siguen siendo independientes. La infraestructura se podrá
+compartir más adelante sin acoplar las inteligencias artificiales.
+
+Para actualizar desde VS Code:
+    git status
+    git pull --ff-only origin mejoras-modulos-vial-conductual
+    python -m unittest discover -s tests -v
+
+El iniciador vial no está validado aún con todos los ángulos/cámaras:
+las detecciones siguen siendo candidatos a revisión, no sanciones.

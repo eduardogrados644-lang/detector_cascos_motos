@@ -80,3 +80,15 @@ Pasar las pruebas unitarias, comprobar la descarga de Git LFS y ejecutar manualm
   positivos; no usar estos videos para reentrenar antes de evaluar.
 - Medir velocidad y memoria real en Windows con los dos modelos y tracking.
 - Sólo después de validar, considerar fusionar el PR de desarrollo a main.
+
+
+## Puntos de entrada para cada apartado
+
+- iniciar_cascos.py: entrada propia del sistema vial. Usa por defecto
+  videos_revisados y yolo11n.pt; está preparado para video y cámaras.
+- iniciar_intencion.py: entrada separada para el futuro sistema de detección
+  de eventos violentos/armas; actualmente sólo informa el estado y ofrece
+  demostración experimental de posturas con yolo11n-pose.pt.
+- Nunca son dos proyectos o dos repositorios: sólo dos apartados.
+- No unir modelos o datos entre los apartados. Desarrollar el modelo
+  especializado conductual antes de ofrecer detección real de armas/violencia.
