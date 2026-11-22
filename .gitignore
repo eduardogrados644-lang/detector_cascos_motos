@@ -39,3 +39,7 @@ runs/
 # Capturas locales de personas para revisión
 resultados/capturas_camara/
 resultados/ejemplos_para_etiquetar/
+
+# Resultados de módulos nuevos: eventos sensibles o medios locales
+resultados/conductual/
+resultados/vehiculos/
