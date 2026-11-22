@@ -293,7 +293,7 @@ class ConfirmadorEventosViales:
                 if previo and previo[0] == paso - 1 and _continuidad(previo[2], caja)
                 else 1
             )
-            siguientes[clave] = (paso, cantidad)
+            siguientes[clave] = (paso, cantidad, caja)
             moto_id = relacion.moto.track_id
             persona_id = relacion.persona.track_id
             if cantidad >= self.observaciones_minimas and clave not in self._registradas:
