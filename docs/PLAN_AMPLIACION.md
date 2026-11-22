@@ -104,3 +104,14 @@ Pasar las pruebas unitarias, comprobar la descarga de Git LFS y ejecutar manualm
   Windows y fuentes HTTP MJPEG; conservan sus modelos y reglas independientes.
 - Es necesario validar índices USB reales y conectividad LAN en Windows.
 - En la demostración conductual no se activan modelos de violencia o armas.
+
+
+## Novena entrega: dos modos dentro del control vial (misma IA de cascos)
+
+- \`iniciar_cascos.py --modo vial\`: funciona como antes, integra COCO + cascos.
+- \`iniciar_cascos.py --modo cascos\`: usa únicamente el modelo de cascos, sin
+  exigir motos y sin generar infracciones (útil para videos recortados p15/p16).
+- El modo cascos escribe un JSON de apariciones por fotograma y video opcional,
+  no perfiles/identidades ni sanciones. El apartado conductual sigue separado.
+- Antes de fusionar en main: ejecutar ambos modos en Windows, revisar imágenes
+  contra etiquetas humanas y probar cámaras externas.

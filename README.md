@@ -285,3 +285,26 @@ Si continúa sin encontrar motos, revisar una captura del vídeo original
 o del \`anotado.mp4\` para comprobar el campo de visión antes de ajustar
 umbrales, entrenar un modelo nuevo o declarar cero infracciones.
 Los cuatro videos de prueba reservados no deben reintroducirse en entrenamiento.
+
+
+## Nueva modalidad: SOLO CASCOS (dentro del apartado vial)
+
+Los videos reservados p16 muestran detecciones de casco/sin casco pero el
+detector de motos no encontró motocicletas. Para evaluar el detector de cascos
+sin confundir «0 motos» con «0 personas sin casco», se añadió una modalidad
+dentro del mismo iniciador, sin mezclar el apartado conductual:
+
+    python iniciar_cascos.py --modo cascos --fuente "videos_prueba\With Helmet\p16.mp4" --guardar-video --sin-mostrar --max-fotogramas 300
+    python iniciar_cascos.py --modo cascos --fuente "videos_prueba\Without Helmet\p16.mp4" --guardar-video --sin-mostrar --max-fotogramas 300
+
+El modo \`vial\` existente permanece predeterminado y sigue usando COCO
+y el modelo de cascos para asociar motos/personas/cabezas:
+
+    python iniciar_cascos.py --modo vial --fuente prueba_motos.mp4 --guardar-video
+
+En modo \`cascos\` sólo se carga el modelo de cascos, se guardan apariciones
+por fotograma y, opcionalmente, \`anotado_cascos.mp4\`. Se crea
+\`resultados/solo_cascos/sesion_.../resumen_cascos.json\` con un estado
+explícito SIN vinculación a motocicletas; esto NO confirma infracciones ni
+cuenta personas únicas. Los resultados y videos de evaluación quedan
+excluidos del control de versiones. No son un tercer proyecto.
