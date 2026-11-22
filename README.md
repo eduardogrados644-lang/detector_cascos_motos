@@ -38,7 +38,7 @@ Busca las clases person y motorcycle usando pesos de detección COCO (yolo11n.pt
 ## Prototipo conductual independiente
 
     .\.venv\Scripts\python.exe -m modules.behavioral.pose_detector --fuente prueba_motos.mp4 --mostrar
-    .\.venv\Scripts\python.exe -m modules.behavioral.pose_detector --fuente 0 --mostrar --max-fotogramas 200
+    .\.venv\Scripts\python.exe -m modules.behavioral.pose_detector --fuente camara:1 --mostrar --max-fotogramas 200
 
 El modelo yolo11n-pose.pt es distinto de best.pt usado para cascos y de los pesos COCO del complemento vial. Requiere identificadores de seguimiento para confirmar observaciones consecutivas. Registra solo eventos candidatos en resultados/conductual/eventos.csv. La opción --guardar-video produce un video anotado local.
 
