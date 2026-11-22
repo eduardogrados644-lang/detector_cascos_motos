@@ -164,6 +164,10 @@ def ejecutar(args) -> None:
     print(f"Pesos: {args.modelo_vehiculos} + {args.modelo_cascos}")
     print(f"Clases viales: {modelo_vehiculos.names}")
     print(f"Clases casco/placa: {modelo_cascos.names}")
+    print(
+        "Seguimiento independiente de cabezas: "
+        + ("NO (comparación)" if args.sin_seguimiento_cabezas else "SÍ")
+    )
     print("Solo se registran candidatos a revisar; no infracciones confirmadas.")
     print(f"Resultados: {salida}")
 
@@ -176,7 +180,7 @@ def ejecutar(args) -> None:
                 "timestamp_utc", "fuente", "fotograma",
                 "moto_track_id", "persona_track_id",
                 "confianza_sin_casco", "personas_asociadas",
-                "evento", "estado",
+                "evento", "estado", "cabeza_track_id",
             ])
             while True:
                 if args.max_fotogramas and numero >= args.max_fotogramas:
@@ -198,11 +202,23 @@ def ejecutar(args) -> None:
                     device="cpu",
                     verbose=False,
                 )[0]
-                cascos_resultado = modelo_cascos.predict(
+                # Seguimiento separado de cabezas: los ID de persona COCO
+                # pueden cambiar cuando varios pasajeros se superponen.
+                metodo_cabezas = (
+                    modelo_cascos.predict
+                    if args.sin_seguimiento_cabezas
+                    else modelo_cascos.track
+                )
+                cascos_resultado = metodo_cabezas(
                     frame,
                     imgsz=args.imgsz,
                     conf=min(
                         args.conf_casco, args.conf_sin_casco, args.conf_placa
+                    ),
+                    **(
+                        {}
+                        if args.sin_seguimiento_cabezas
+                        else {"persist": True, "tracker": "bytetrack.yaml"}
                     ),
                     device="cpu",
                     verbose=False,
@@ -244,11 +260,13 @@ def ejecutar(args) -> None:
                         evento.personas_asociadas,
                         evento.tipo,
                         "candidato_para_revision",
+                        evento.cabeza_id if evento.cabeza_id is not None else "",
                     ])
                     archivo.flush()
                     print(
                         f"[REVISAR] Moto ID:{evento.moto_id}, "
-                        f"persona ID:{evento.persona_id} en frame {evento.fotograma}"
+                        f"persona ID:{evento.persona_id}, "
+                        f"cabeza ID:{evento.cabeza_id} en frame {evento.fotograma}"
                     )
 
                 if args.mostrar or args.guardar_video:
@@ -322,6 +340,10 @@ def main() -> None:
     parser.add_argument("--max-fotogramas", type=int, default=0)
     parser.add_argument("--mostrar", action="store_true")
     parser.add_argument("--guardar-video", action="store_true")
+    parser.add_argument(
+        "--sin-seguimiento-cabezas", action="store_true",
+        help="Diagnóstico: usa predict sin tracking de cabezas",
+    )
     args = parser.parse_args()
     try:
         ejecutar(args)

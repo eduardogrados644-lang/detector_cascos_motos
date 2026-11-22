@@ -97,5 +97,81 @@ class TestAsociacionVial(unittest.TestCase):
         self.assertEqual({evento.moto_id for evento in eventos}, {11, 12})
 
 
+    def test_dos_ocupantes_misma_moto_dos_candidatos(self):
+        """Ya no se limita a una sola alerta por motocicleta."""
+        primera = Objeto("person", (135, 45, 190, 210), 0.93, 21)
+        segunda = Objeto("person", (210, 45, 265, 210), 0.91, 22)
+        cabeza_a = Objeto("Without Helmet", (148, 55, 173, 80), 0.86, 101)
+        cabeza_b = Objeto("Without Helmet", (225, 55, 250, 80), 0.82, 102)
+        relaciones = relacionar(
+            [MOTO], [primera, segunda], [cabeza_a, cabeza_b]
+        )
+        self.assertEqual(len(relaciones), 2)
+        detector = ConfirmadorEventosViales(2)
+        self.assertEqual(detector.procesar(1, 3, relaciones), [])
+        eventos = detector.procesar(2, 6, relaciones)
+        self.assertEqual(len(eventos), 2)
+        self.assertEqual({e.cabeza_id for e in eventos}, {101, 102})
+        self.assertEqual({e.moto_id for e in eventos}, {11})
+
+    def test_caja_persona_agrupada_permite_dos_cabezas_distintas(self):
+        """Dos cabezas visibles no se reducen a una caja COCO grande."""
+        primera = Objeto("Without Helmet", (190, 53, 211, 79), 0.82, 101)
+        segunda = Objeto("Without Helmet", (171, 53, 186, 79), 0.88, 102)
+        relaciones = relacionar([MOTO], [PERSONA], [primera, segunda])
+        self.assertEqual(len(relaciones), 2)
+        self.assertEqual({r.casco.track_id for r in relaciones}, {101, 102})
+        detector = ConfirmadorEventosViales(2)
+        detector.procesar(1, 3, relaciones)
+        alertas = detector.procesar(2, 6, relaciones)
+        self.assertEqual(len(alertas), 2)
+        self.assertEqual({a.persona_id for a in alertas}, {21})
+        self.assertEqual({a.cabeza_id for a in alertas}, {101, 102})
+        self.assertEqual({a.personas_asociadas for a in alertas}, {1})
+
+    def test_dos_cajas_sobre_misma_cabeza_no_crean_dos_alertas(self):
+        primera = Objeto("Without Helmet", SIN_CASCO.caja, 0.82, 101)
+        repetida = Objeto("Without Helmet", SIN_CASCO.caja, 0.67, 102)
+        relaciones = relacionar([MOTO], [PERSONA], [primera, repetida])
+        self.assertEqual(len(relaciones), 1)
+        self.assertEqual(relaciones[0].casco.track_id, 101)
+        detector = ConfirmadorEventosViales(2)
+        detector.procesar(1, 3, relaciones)
+        self.assertEqual(len(detector.procesar(2, 6, relaciones)), 1)
+
+    def test_cabeza_estable_no_depende_de_id_coco_inestable(self):
+        cabeza = Objeto("Without Helmet", SIN_CASCO.caja, 0.86, 105)
+        detector = ConfirmadorEventosViales(2)
+        primera = relacionar([MOTO], [PERSONA], [cabeza])
+        persona_otra_id = Objeto("person", PERSONA.caja, 0.9, 88)
+        segunda = relacionar([MOTO], [persona_otra_id], [cabeza])
+        self.assertEqual(detector.procesar(1, 3, primera), [])
+        eventos = detector.procesar(2, 6, segunda)
+        self.assertEqual(len(eventos), 1)
+        self.assertEqual(eventos[0].cabeza_id, 105)
+        self.assertEqual(eventos[0].persona_id, 88)
+
+    def test_un_mismo_id_con_salto_brutal_reinicia_confirmacion(self):
+        """Previene atribuir a otro ocupante un track ID reciclado."""
+        detector = ConfirmadorEventosViales(2)
+        primera = relacionar([MOTO], [PERSONA], [SIN_CASCO])
+        persona_saltada = Objeto("person", (235, 45, 295, 210), 0.94, 21)
+        casco_saltado = Objeto("Without Helmet", (255, 53, 274, 79), 0.90)
+        segunda = relacionar([MOTO], [persona_saltada], [casco_saltado])
+        self.assertEqual(len(segunda), 1)
+        self.assertEqual(segunda[0].estado, "sin_casco")
+        detector.procesar(1, 3, primera)
+        self.assertEqual(detector.procesar(2, 6, segunda), [])
+        self.assertEqual(len(detector.procesar(3, 9, segunda)), 1)
+
+    def test_no_repite_cabeza_ya_confirmada(self):
+        cabeza = Objeto("Without Helmet", SIN_CASCO.caja, 0.84, 101)
+        relaciones = relacionar([MOTO], [PERSONA], [cabeza])
+        detector = ConfirmadorEventosViales(2)
+        detector.procesar(1, 3, relaciones)
+        self.assertEqual(len(detector.procesar(2, 6, relaciones)), 1)
+        for paso in range(3, 15):
+            self.assertEqual(detector.procesar(paso, paso * 3, relaciones), [])
+
 if __name__ == "__main__":
     unittest.main()

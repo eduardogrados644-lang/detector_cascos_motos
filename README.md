@@ -62,7 +62,7 @@ Este módulo combina **dos modelos diferentes del apartado vial** en un único f
 
 Los resultados se crean en una carpeta nueva por sesión bajo resultados/vial_integrado/. Allí encontrarás eventos.csv y, solo si se pide, anotado.mp4. Sin --guardar-video no se guardan imágenes de personas.
 
-**Interpretación**: una asociación geométrica no demuestra que alguien conduzca una moto. El CSV guarda únicamente candidatos de persona sin casco observados en 4 fotogramas analizados consecutivos, vinculados al MISMO track de persona y de moto, y limita los duplicados por moto. Las clases de casco se atribuyen solo cuando su caja cae cerca de la zona superior del cuerpo. Si es ambiguo, queda como desconocido, no como infracción.
+**Interpretación**: una asociación geométrica no demuestra que alguien conduzca una moto. El CSV guarda únicamente candidatos de persona sin casco observados en 4 fotogramas analizados consecutivos, vinculados al MISMO track de persona y de moto, y limita los duplicados por moto en la versión inicial. En la mejora siguiente la deduplicación pasa a ser por cabeza rastreada. Las clases de casco se atribuyen solo cuando su caja cae cerca de la zona superior del cuerpo. Si es ambiguo, queda como desconocido, no como infracción.
 
 Si el CSV está vacío aparte de la cabecera, significa que ningún evento cumplió los filtros, no que todos lleven casco. Revisa las cajas dibujadas y comprueba si la geometría de las etiquetas del dataset coincide con esas reglas. El script NO cuenta pasajeros reales, NO lee caracteres de matrícula y NO determina culpabilidad.
 
@@ -108,3 +108,38 @@ desconocidas. El nombre numberplate se normaliza a placa.
 
 No entrenes con videos reservados usados para evaluación. Si los pesos
 refinados no están descargados, ejecuta git lfs pull y vuelve a probar.
+
+
+## Cuarta entrega: seguimiento independiente de cabezas y varios ocupantes
+
+El análisis anterior detectó un problema de los videos: ByteTrack COCO puede
+asignar la misma caja/ID de persona a pasajeros distintos cuando se superponen.
+Por eso esta entrega mantiene **dos trackings separados dentro del apartado vial**:
+(1) personas y motos con YOLO COCO; (2) cabezas con y sin casco con el modelo
+especializado. Esto no incluye el apartado conductual, que sigue independiente.
+
+- En el video anotado se mostrará el ID de cada cabeza cuando esté disponible.
+- Si una caja de persona contiene dos cabezas diferenciables, el sistema puede
+  conservar dos hipótesis. **No significa que pueda contar ocupantes reales.**
+- Los candidatos se deduplican por combinación de moto y cabeza rastreada.
+  Si no hay ID de cabeza, usa el ID de persona y una comprobación de continuidad
+  de la caja. Dos etiquetas superpuestas de una misma cabeza no dan dos eventos.
+- Un salto brusco de caja reinicia la secuencia de confirmación; esto reduce
+  confusiones de identidad, pero puede omitir eventos reales en cámaras móviles.
+- Los resultados siguen siendo candidatos para revisión, nunca multas.
+
+Prueba recomendada en VS Code (el modelo original no se sobrescribe):
+
+    python -m modules.traffic.road_monitor --fuente prueba_motos.mp4 --modelo-cascos "resultados/entrenamientos/videos_revisados/weights/best.pt" --mostrar --guardar-video
+
+Para comparar sin seguimiento de cabezas:
+
+    python -m modules.traffic.road_monitor --fuente prueba_motos.mp4 --modelo-cascos "resultados/entrenamientos/videos_revisados/weights/best.pt" --sin-seguimiento-cabezas --guardar-video
+
+El archivo eventos.csv incorpora cabeza_track_id (vacío cuando no se obtiene).
+Aunque existan dos registros para una moto, no confirma que haya dos ocupantes
+diferentes: la estabilidad de IDs se debe comprobar revisando el video.
+
+Verifica los modelos en los videos reservados With Helmet y Without Helmet.
+La aprobación del PR hacia main depende de comprobar resultados y falsos positivos
+en la computadora donde se ejecuta YOLO.

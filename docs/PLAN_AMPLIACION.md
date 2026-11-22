@@ -61,3 +61,22 @@ Pasar las pruebas unitarias, comprobar la descarga de Git LFS y ejecutar manualm
 2. Medir falsos positivos de asociación; la cercanía espacial no implica conducción y las etiquetas del dataset pueden representar regiones distintas de una cabeza.
 3. Ajustar umbrales según evidencias y probar vehículos con varios ocupantes y peatones cercanos.
 4. Evaluar consumo de CPU y fluidez antes de añadirlo a main.
+
+
+## Cuarta entrega: trazabilidad por cabeza (experimental)
+
+- Seguimiento por separado de COCO persona/moto y cabezas con el modelo de cascos.
+- Permitir candidatos independientes por cabeza rastreada dentro de una misma moto.
+- Supresión de etiquetas duplicadas y contradictorias sobre una cabeza.
+- Reinicio de confirmación ante saltos importantes de caja; sin identificar personas.
+- El ID de cabeza es temporal y puede cambiar con oclusiones. No hay conteo
+  garantizado de pasajeros, reconocimiento de identidades ni infracciones.
+- No se toca la IA conductual.
+
+### Validación necesaria para completar control vial
+- Revisar el video anotado en un caso de varios ocupantes, verificar cuál cabeza
+  corresponde a cada caja, y documentar cambios de ID.
+- Probar p15/p16 tanto With Helmet como Without Helmet para detectar falsos
+  positivos; no usar estos videos para reentrenar antes de evaluar.
+- Medir velocidad y memoria real en Windows con los dos modelos y tracking.
+- Sólo después de validar, considerar fusionar el PR de desarrollo a main.

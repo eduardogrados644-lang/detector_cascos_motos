@@ -33,6 +33,7 @@ class EventoVial:
     confianza: float
     personas_asociadas: int
     tipo: str = "posible_persona_sin_casco"
+    cabeza_id: int | None = None
 
 
 def normalizar_clase(nombre: str) -> str:
@@ -151,69 +152,160 @@ def relacionar(
             continue
         cascos_por_persona.setdefault(puntuaciones[0][1], []).append(casco)
 
+
     relaciones: list[Relacion] = []
     for pi, mi in sorted(asignaciones.items()):
         etiquetas = cascos_por_persona.get(pi, [])
-        tipos = {normalizar_clase(item.clase) for item in etiquetas}
-        if len(tipos) != 1 or not tipos:
-            estado, casco_asociado = "desconocido", None
-        else:
-            tipo = next(iter(tipos))
-            estado = tipo
-            casco_asociado = max(etiquetas, key=lambda item: item.confianza)
-        relaciones.append(Relacion(motos[mi], personas[pi], casco_asociado, estado))
+        if not etiquetas:
+            relaciones.append(
+                Relacion(motos[mi], personas[pi], None, "desconocido")
+            )
+            continue
+
+        # Una caja COCO de persona puede incluir varios ocupantes superpuestos.
+        # Agrupar sólo las etiquetas que parecen describir la misma cabeza.
+        # Si hay etiquetas contradictorias para la misma cabeza, no emitir caso.
+        grupos: list[list[Objeto]] = []
+        for etiqueta in sorted(etiquetas, key=lambda x: x.confianza, reverse=True):
+            grupo = next(
+                (
+                    grupo
+                    for grupo in grupos
+                    if any(_iou(etiqueta.caja, otro.caja) >= 0.40 for otro in grupo)
+                ),
+                None,
+            )
+            if grupo is None:
+                grupos.append([etiqueta])
+            else:
+                grupo.append(etiqueta)
+        for grupo in grupos:
+            tipos = {normalizar_clase(item.clase) for item in grupo}
+            if len(tipos) != 1:
+                relaciones.append(
+                    Relacion(motos[mi], personas[pi], None, "desconocido")
+                )
+            else:
+                relaciones.append(
+                    Relacion(
+                        motos[mi],
+                        personas[pi],
+                        max(grupo, key=lambda x: x.confianza),
+                        next(iter(tipos)),
+                    )
+                )
     return relaciones
 
 
-class ConfirmadorEventosViales:
-    """Alertas por moto tras observaciones consecutivas del MISMO rider.
+def _iou(
+    a: tuple[float, float, float, float],
+    b: tuple[float, float, float, float],
+) -> float:
+    """Intersección de rectángulos / unión, para duplicados y continuidad."""
+    ix1, iy1 = max(a[0], b[0]), max(a[1], b[1])
+    ix2, iy2 = min(a[2], b[2]), min(a[3], b[3])
+    inter = max(0.0, ix2 - ix1) * max(0.0, iy2 - iy1)
+    wa, ha = max(0.0, a[2] - a[0]), max(0.0, a[3] - a[1])
+    wb, hb = max(0.0, b[2] - b[0]), max(0.0, b[3] - b[1])
+    union = wa * ha + wb * hb - inter
+    return inter / union if union > 0 else 0.0
 
-    Los eventos se emiten una vez por track de motocicleta por ejecución,
-    para no contar el mismo vehículo múltiples veces.
+
+def _continuidad(
+    anterior: tuple[float, float, float, float],
+    actual: tuple[float, float, float, float],
+) -> bool:
+    """Rechaza saltos bruscos de caja asociados a reciclaje de track ID.
+
+    Puede reiniciar observaciones auténticas con cámaras móviles. Es preferible
+    perder una alerta tentativa a atribuirla a la persona equivocada.
+    """
+    aw, ah = _dimensiones(anterior)
+    bw, bh = _dimensiones(actual)
+    if min(aw, ah, bw, bh) <= 0:
+        return False
+    area_anterior, area_actual = aw * ah, bw * bh
+    if min(area_anterior, area_actual) / max(area_anterior, area_actual) < 0.35:
+        return False
+    if _iou(anterior, actual) >= 0.12:
+        return True
+    cx_a = (anterior[0] + anterior[2]) / 2
+    cy_a = (anterior[1] + anterior[3]) / 2
+    cx_b = (actual[0] + actual[2]) / 2
+    cy_b = (actual[1] + actual[3]) / 2
+    return (
+        abs(cx_b - cx_a) <= 0.75 * max(aw, bw)
+        and abs(cy_b - cy_a) <= 0.75 * max(ah, bh)
+    )
+
+
+class ConfirmadorEventosViales:
+    """Confirma candidatos por cabeza rastreada, no una sola alerta por moto.
+
+    Si hay track ID de cabeza se prefiere a la caja COCO de persona, que puede
+    intercambiar IDs al solaparse varios ocupantes. Si el modelo de cabezas
+    no entrega ID, se recurre al track de persona; se aplica continuidad de caja.
+    Esto NO cuenta automáticamente ocupantes reales.
     """
 
     def __init__(self, observaciones_minimas: int = 4) -> None:
         if observaciones_minimas < 2:
             raise ValueError("observaciones_minimas debe ser al menos 2")
         self.observaciones_minimas = observaciones_minimas
-        self._rachas: dict[tuple[int, int], tuple[int, int]] = {}
-        self._registradas: set[int] = set()
+        self._rachas: dict[
+            tuple[int, int], tuple[int, int, tuple[float, float, float, float]]
+        ] = {}
+        self._registradas: set[tuple[int, int]] = set()
 
     def procesar(
         self, paso: int, fotograma: int, relaciones: list[Relacion]
     ) -> list[EventoVial]:
         if paso < 1 or fotograma < 1:
             raise ValueError("paso y fotograma deben ser positivos")
+
         candidatas: dict[tuple[int, int], Relacion] = {}
-        por_moto: dict[int, int] = {}
+        por_moto: dict[int, set[int]] = {}
         for relacion in relaciones:
             moto_id = relacion.moto.track_id
             persona_id = relacion.persona.track_id
             if moto_id is None or persona_id is None:
                 continue
-            por_moto[moto_id] = por_moto.get(moto_id, 0) + 1
-            if relacion.estado == "sin_casco" and relacion.casco is not None:
-                clave = (moto_id, persona_id)
-                actual = candidatas.get(clave)
-                if actual is None or relacion.casco.confianza > actual.casco.confianza:
-                    candidatas[clave] = relacion
+            por_moto.setdefault(moto_id, set()).add(persona_id)
+            if relacion.estado != "sin_casco" or relacion.casco is None:
+                continue
+            cabeza_id = relacion.casco.track_id
+            # IDs negativos sólo en el modo de respaldo por persona.
+            clave = (moto_id, cabeza_id if cabeza_id is not None else -persona_id - 1)
+            actual = candidatas.get(clave)
+            if actual is None or relacion.casco.confianza > actual.casco.confianza:
+                candidatas[clave] = relacion
 
-        siguientes: dict[tuple[int, int], tuple[int, int]] = {}
+        siguientes: dict[
+            tuple[int, int], tuple[int, int, tuple[float, float, float, float]]
+        ] = {}
         eventos: list[EventoVial] = []
         for clave, relacion in sorted(candidatas.items()):
             previo = self._rachas.get(clave)
-            cantidad = previo[1] + 1 if previo and previo[0] == paso - 1 else 1
+            cabeza_id = relacion.casco.track_id
+            caja = relacion.casco.caja if cabeza_id is not None else relacion.persona.caja
+            cantidad = (
+                previo[1] + 1
+                if previo and previo[0] == paso - 1 and _continuidad(previo[2], caja)
+                else 1
+            )
             siguientes[clave] = (paso, cantidad)
-            moto_id, persona_id = clave
-            if cantidad >= self.observaciones_minimas and moto_id not in self._registradas:
-                self._registradas.add(moto_id)
+            moto_id = relacion.moto.track_id
+            persona_id = relacion.persona.track_id
+            if cantidad >= self.observaciones_minimas and clave not in self._registradas:
+                self._registradas.add(clave)
                 eventos.append(
                     EventoVial(
-                        fotograma,
-                        moto_id,
-                        persona_id,
-                        relacion.casco.confianza,
-                        por_moto.get(moto_id, 0),
+                        fotograma=fotograma,
+                        moto_id=moto_id,
+                        persona_id=persona_id,
+                        confianza=relacion.casco.confianza,
+                        personas_asociadas=len(por_moto.get(moto_id, ())),
+                        cabeza_id=cabeza_id,
                     )
                 )
         self._rachas = siguientes
