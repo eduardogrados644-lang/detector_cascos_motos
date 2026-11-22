@@ -35,7 +35,7 @@ def revisar() -> int:
         archivo = RAIZ / nombre
         if not archivo.is_file():
             print(f"[AVISO] No existe: {nombre}")
-        elif archivo.read_bytes()[:60].startswith(
+        elif archivo.stat().st_size < 200 and archivo.read_bytes()[:60].startswith(
             b"version https://git-lfs.github.com/spec/v1"
         ):
             print(f"[AVISO] {nombre}: puntero Git LFS; ejecuta git lfs pull")
