@@ -36,6 +36,16 @@ class EventoVial:
     cabeza_id: int | None = None
 
 
+@dataclass(frozen=True)
+class PosibleDuplicado:
+    """Rastro sospechoso de ser una reidentificación, no otro ocupante."""
+    fotograma: int
+    moto_id: int
+    persona_id: int
+    cabeza_id: int | None
+    cabeza_anterior_id: int | None
+
+
 def normalizar_clase(nombre: str) -> str:
     texto = normalize("NFKD", nombre).encode("ascii", "ignore").decode()
     texto = texto.lower().replace("_", " ").replace("-", " ").strip()
@@ -239,6 +249,39 @@ def _continuidad(
     )
 
 
+def _firma_relativa(relacion: Relacion) -> tuple[float, float, float, float] | None:
+    """Posición de cabeza relativa a moto, estable ante desplazamiento/zoom."""
+    if relacion.casco is None:
+        return None
+    mx1, my1, _, _ = relacion.moto.caja
+    mw, mh = _dimensiones(relacion.moto.caja)
+    hw, hh = _dimensiones(relacion.casco.caja)
+    if min(mw, mh, hw, hh) <= 0:
+        return None
+    x1, y1, x2, y2 = relacion.casco.caja
+    return (
+        ((x1 + x2) / 2 - mx1) / mw,
+        ((y1 + y2) / 2 - my1) / mh,
+        hw / mw,
+        hh / mh,
+    )
+
+
+def _misma_zona_relativa(
+    firma1: tuple[float, float, float, float],
+    firma2: tuple[float, float, float, float],
+) -> bool:
+    """Sólo candidata a duplicado: no prueba identidad humana."""
+    if abs(firma1[0] - firma2[0]) > 0.13:
+        return False
+    if abs(firma1[1] - firma2[1]) > 0.13:
+        return False
+    for dim1, dim2 in zip(firma1[2:], firma2[2:]):
+        if min(dim1, dim2) <= 0 or min(dim1, dim2) / max(dim1, dim2) < 0.50:
+            return False
+    return True
+
+
 class ConfirmadorEventosViales:
     """Confirma candidatos por cabeza rastreada, no una sola alerta por moto.
 
@@ -256,6 +299,13 @@ class ConfirmadorEventosViales:
             tuple[int, int], tuple[int, int, tuple[float, float, float, float]]
         ] = {}
         self._registradas: set[tuple[int, int]] = set()
+        # Zonas emitidas: (paso, cabeza ID, posición relativa a la moto).
+        self._zonas_emitidas: dict[
+            int, list[tuple[int, int | None, tuple[float, float, float, float]]]
+        ] = {}
+        # Diferencia explícita: dos cabezas visibles a la vez no son un cambio de ID.
+        self._coobservadas: set[tuple[int, int, int]] = set()
+        self.posibles_duplicados: list[PosibleDuplicado] = []
 
     def procesar(
         self, paso: int, fotograma: int, relaciones: list[Relacion]
@@ -263,6 +313,7 @@ class ConfirmadorEventosViales:
         if paso < 1 or fotograma < 1:
             raise ValueError("paso y fotograma deben ser positivos")
 
+        self.posibles_duplicados = []
         candidatas: dict[tuple[int, int], Relacion] = {}
         por_moto: dict[int, set[int]] = {}
         for relacion in relaciones:
@@ -279,6 +330,24 @@ class ConfirmadorEventosViales:
             actual = candidatas.get(clave)
             if actual is None or relacion.casco.confianza > actual.casco.confianza:
                 candidatas[clave] = relacion
+
+        # Si se observan simultáneamente dos cabezas separadas en una moto,
+        # nunca interpretar el cambio entre sus IDs como reidentificación.
+        por_moto_cabezas: dict[int, list[Objeto]] = {}
+        for relacion in candidatas.values():
+            if relacion.casco is not None and relacion.casco.track_id is not None:
+                por_moto_cabezas.setdefault(
+                    relacion.moto.track_id, []
+                ).append(relacion.casco)
+        for moto_id, cabezas in por_moto_cabezas.items():
+            for indice, primera in enumerate(cabezas):
+                for segunda in cabezas[indice + 1:]:
+                    if primera.track_id == segunda.track_id:
+                        continue
+                    if _iou(primera.caja, segunda.caja) >= 0.35:
+                        continue
+                    par = sorted((primera.track_id, segunda.track_id))
+                    self._coobservadas.add((moto_id, par[0], par[1]))
 
         siguientes: dict[
             tuple[int, int], tuple[int, int, tuple[float, float, float, float]]
@@ -298,6 +367,34 @@ class ConfirmadorEventosViales:
             persona_id = relacion.persona.track_id
             if cantidad >= self.observaciones_minimas and clave not in self._registradas:
                 self._registradas.add(clave)
+                firma = _firma_relativa(relacion)
+                reidentificada = None
+                coincide_zona = False
+                if firma is not None:
+                    for paso_anterior, id_anterior, firma_anterior in self._zonas_emitidas.get(moto_id, []):
+                        # Límite de ventana: no fusionar vehículos en sesiones largas.
+                        if paso - paso_anterior > 120:
+                            continue
+                        if id_anterior is not None and cabeza_id is not None:
+                            par = sorted((id_anterior, cabeza_id))
+                            if (moto_id, par[0], par[1]) in self._coobservadas:
+                                continue
+                        if _misma_zona_relativa(firma, firma_anterior):
+                            reidentificada = id_anterior
+                            coincide_zona = True
+                            break
+                if coincide_zona:
+                    self.posibles_duplicados.append(
+                        PosibleDuplicado(
+                            fotograma, moto_id, persona_id,
+                            cabeza_id, reidentificada,
+                        )
+                    )
+                    continue
+                if firma is not None:
+                    self._zonas_emitidas.setdefault(moto_id, []).append(
+                        (paso, cabeza_id, firma)
+                    )
                 eventos.append(
                     EventoVial(
                         fotograma=fotograma,

@@ -4,6 +4,7 @@ import unittest
 from modules.traffic.association import (
     ConfirmadorEventosViales,
     Objeto,
+    Relacion,
     normalizar_clase,
     relacionar,
 )
@@ -172,6 +173,83 @@ class TestAsociacionVial(unittest.TestCase):
         self.assertEqual(len(detector.procesar(2, 6, relaciones)), 1)
         for paso in range(3, 15):
             self.assertEqual(detector.procesar(paso, paso * 3, relaciones), [])
+
+    def test_reidentificacion_178_232_no_es_otro_candidato(self):
+        """Regresión con cajas aproximadas de los dos avisos del video recibido."""
+        moto_inicio = Objeto("moto", (755, 277, 952, 564), 0.93, 6)
+        persona_inicio = Objeto("persona", (772, 160, 966, 491), 0.94, 2)
+        cabeza_14 = Objeto("sin_casco", (825, 188, 878, 261), 0.78, 14)
+        moto_final = Objeto("moto", (659, 131, 924, 512), 0.92, 6)
+        persona_final = Objeto("persona", (684, 13, 942, 413), 0.95, 2)
+        cabeza_25 = Objeto("sin_casco", (755, 25, 838, 108), 0.86, 25)
+        primera = Relacion(moto_inicio, persona_inicio, cabeza_14, "sin_casco")
+        segunda = Relacion(moto_final, persona_final, cabeza_25, "sin_casco")
+        detector = ConfirmadorEventosViales(2)
+
+        self.assertEqual(detector.procesar(1, 175, [primera]), [])
+        aceptadas = detector.procesar(2, 178, [primera])
+        self.assertEqual(len(aceptadas), 1)
+        self.assertEqual(aceptadas[0].cabeza_id, 14)
+
+        for paso in range(3, 20):
+            self.assertEqual(detector.procesar(paso, 178 + 3 * (paso - 2), []), [])
+        detector.procesar(20, 229, [segunda])
+        self.assertEqual(detector.procesar(21, 232, [segunda]), [])
+        self.assertEqual(len(detector.posibles_duplicados), 1)
+        duplicado = detector.posibles_duplicados[0]
+        self.assertEqual((duplicado.moto_id, duplicado.cabeza_id, duplicado.cabeza_anterior_id), (6, 25, 14))
+
+    def test_otra_cabeza_otra_zona_no_se_oculta(self):
+        """Dos ocupantes pueden confirmar por separado aunque no sean simultáneos."""
+        moto = Objeto("moto", (100, 150, 300, 250), 0.92, 11)
+        persona = Objeto("persona", (120, 30, 275, 210), 0.92, 21)
+        cabeza_a = Objeto("sin_casco", (135, 55, 155, 75), 0.89, 101)
+        cabeza_b = Objeto("sin_casco", (240, 55, 260, 75), 0.90, 102)
+        primero = Relacion(moto, persona, cabeza_a, "sin_casco")
+        segundo = Relacion(moto, persona, cabeza_b, "sin_casco")
+        detector = ConfirmadorEventosViales(2)
+        detector.procesar(1, 3, [primero])
+        self.assertEqual(len(detector.procesar(2, 6, [primero])), 1)
+        detector.procesar(3, 9, [])
+        detector.procesar(4, 12, [segundo])
+        eventos = detector.procesar(5, 15, [segundo])
+        self.assertEqual(len(eventos), 1)
+        self.assertEqual(eventos[0].cabeza_id, 102)
+        self.assertEqual(detector.posibles_duplicados, [])
+
+    def test_coobservadas_distintas_no_se_fusionan_pese_a_zona_cercana(self):
+        """Si están a la vista juntas, los ID no se tratan como reidentificación."""
+        moto = Objeto("moto", (100, 150, 300, 250), 0.9, 11)
+        persona = Objeto("persona", (165, 40, 255, 220), 0.9, 21)
+        cabeza_a = Objeto("sin_casco", (188, 50, 208, 76), 0.9, 101)
+        cabeza_b = Objeto("sin_casco", (211, 50, 231, 76), 0.9, 102)
+        a = Relacion(moto, persona, cabeza_a, "sin_casco")
+        b = Relacion(moto, persona, cabeza_b, "sin_casco")
+        detector = ConfirmadorEventosViales(2)
+        detector.procesar(1, 3, [a, b])
+        aceptadas = detector.procesar(2, 6, [a])
+        self.assertEqual(len(aceptadas), 1)
+        detector.procesar(3, 9, [b])
+        aceptadas = detector.procesar(4, 12, [b])
+        self.assertEqual(len(aceptadas), 1)
+        self.assertEqual(aceptadas[0].cabeza_id, 102)
+        self.assertEqual(detector.posibles_duplicados, [])
+
+    def test_reidentificacion_no_fusiona_motocicletas_distintas(self):
+        moto_1 = Objeto("moto", (100, 150, 300, 250), 0.9, 11)
+        moto_2 = Objeto("moto", (100, 150, 300, 250), 0.9, 12)
+        persona = Objeto("persona", (150, 40, 250, 220), 0.9, 21)
+        cabeza_a = Objeto("sin_casco", (190, 50, 210, 80), 0.9, 101)
+        cabeza_b = Objeto("sin_casco", (190, 50, 210, 80), 0.9, 102)
+        a = Relacion(moto_1, persona, cabeza_a, "sin_casco")
+        b = Relacion(moto_2, persona, cabeza_b, "sin_casco")
+        detector = ConfirmadorEventosViales(2)
+        detector.procesar(1, 3, [a])
+        self.assertEqual(len(detector.procesar(2, 6, [a])), 1)
+        detector.procesar(3, 9, [])
+        detector.procesar(4, 12, [b])
+        self.assertEqual(len(detector.procesar(5, 15, [b])), 1)
+
 
 if __name__ == "__main__":
     unittest.main()

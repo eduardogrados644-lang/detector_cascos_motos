@@ -221,3 +221,35 @@ Ambos apartados comparten **solo el lector de cámara**, no el modelo YOLO,
 datasets, reglas de clasificación ni los eventos. El apartado conductual
 continúa reservado a demostraciones de posturas hasta disponer de modelos
 especializados validados.
+
+
+## Quinta prueba vial: alerta duplicada por cambio de ID de cabeza
+
+El video anotado de la sesión 20261122_210829_803847 mostró dos alertas
+sobre la **misma cabeza aparente** de la moto ID 6 / persona ID 2: una en
+fotograma 178 (cabeza ID 14) y otra en 232 (cabeza ID 25). No hay
+evidencia de que esas alertas correspondan a dos ocupantes distintos.
+
+Se añadió una comprobación conservadora de **zona relativa a la moto**:
+si un ID nuevo aparece poco después en prácticamente la misma posición
+y con un tamaño relativo parecido, la segunda alarma se clasifica como
+**posible reidentificación** y no suma otro candidato de evento. Si se
+observaron dos cabezas distintas simultáneamente, no se fusionan.
+
+Las alertas aceptadas siguen en \`eventos.csv\`, y los cambios sospechosos
+de ID quedan para auditoría en \`posibles_duplicados.csv\`. El mensaje
+\`[POSIBLE DUPLICADO]\` **no demuestra** que sea el mismo ocupante; es
+una señal de seguimiento que requiere revisión humana. Los filtros pueden
+pasar por alto a dos ocupantes parcialmente superpuestos, por lo que
+NO se deben utilizar estos conteos para sanciones ni conteo definitivo.
+
+Prueba desde Windows:
+
+    git pull --ff-only origin mejoras-modulos-vial-conductual
+    python -m unittest discover -s tests -v
+    python iniciar_cascos.py --fuente prueba_motos.mp4 --guardar-video
+
+Comprueba las nuevas cifras \`candidatos a revisar\` y
+\`posibles duplicados de seguimiento\`. Esperamos que el caso del segundo
+ID se revise como posible duplicado, pero la confirmación exige ejecutar
+YOLO en el Windows del proyecto y examinar el video anotado.

@@ -168,6 +168,13 @@ def ejecutar(args) -> None:
     )
     print("Solo se registran candidatos a revisar; no infracciones confirmadas.")
     print(f"Resultados: {salida}")
+    ruta_duplicados = salida / "posibles_duplicados.csv"
+    with ruta_duplicados.open("w", encoding="utf-8", newline="") as archivo_duplicados:
+        csv.writer(archivo_duplicados).writerow([
+            "timestamp_utc", "fuente", "fotograma", "moto_track_id",
+            "persona_track_id", "cabeza_nueva_id", "cabeza_previa_id",
+            "estado",
+        ])
 
     try:
         with (salida / "eventos.csv").open(
@@ -239,6 +246,27 @@ def ejecutar(args) -> None:
                 personas = [o for o in objetos_viales if o.clase == "persona"]
                 relaciones = relacionar(motos, personas, objetos_cascos)
                 eventos = confirmar.procesar(paso, numero, relaciones)
+                duplicados = confirmar.posibles_duplicados
+                total["posibles_duplicados"] += len(duplicados)
+                if duplicados:
+                    with ruta_duplicados.open(
+                        "a", encoding="utf-8", newline=""
+                    ) as archivo_duplicados:
+                        escritor_duplicados = csv.writer(archivo_duplicados)
+                        for duplicado in duplicados:
+                            escritor_duplicados.writerow([
+                                datetime.now(timezone.utc).isoformat(),
+                                args.fuente, duplicado.fotograma,
+                                duplicado.moto_id, duplicado.persona_id,
+                                duplicado.cabeza_id, duplicado.cabeza_anterior_id,
+                                "posible_reidentificacion_para_revision",
+                            ])
+                            print(
+                                f"[POSIBLE DUPLICADO] Moto ID:{duplicado.moto_id}, "
+                                f"cabeza {duplicado.cabeza_id} podría repetir "
+                                f"la alerta de cabeza {duplicado.cabeza_anterior_id} "
+                                f"en frame {duplicado.fotograma}"
+                            )
 
                 total["personas"] += len(personas)
                 total["motos"] += len(motos)
@@ -308,7 +336,8 @@ def ejecutar(args) -> None:
         f"{paso / segundos:.2f} frames analizados/seg. "
         f"Apariciones persona/moto: {total['personas']}/{total['motos']}; "
         f"asociaciones: {total['relaciones']}; "
-        f"candidatos a revisar: {total['candidatos']}"
+        f"candidatos a revisar: {total['candidatos']}; "
+        f"posibles duplicados de seguimiento: {total['posibles_duplicados']}"
     )
     print(
         "Detecciones casco/placa por clase: "
@@ -319,6 +348,7 @@ def ejecutar(args) -> None:
         + str({nombre: total[f"asociacion_{nombre}"] for nombre in ("con_casco", "sin_casco", "desconocido")})
     )
     print(f"CSV: {salida / 'eventos.csv'}")
+    print(f"Revisiones de duplicados: {ruta_duplicados}")
 
 
 def main() -> None:
