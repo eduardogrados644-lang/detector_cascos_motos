@@ -147,6 +147,9 @@ en la computadora donde se ejecuta YOLO.
 
 ## Iniciadores de los dos apartados (mismo repositorio)
 
+En Windows puedes abrir directamente **Iniciar_Cascos.bat** o **Iniciar_Intencion.bat** con doble clic. Ambos priorizan el Python del entorno `.venv` y abren únicamente su apartado correspondiente.
+
+
 En la raíz hay **dos archivos para iniciar cada tema por separado**:
 
 - **Control vial (disponible para pruebas):** python iniciar_cascos.py
