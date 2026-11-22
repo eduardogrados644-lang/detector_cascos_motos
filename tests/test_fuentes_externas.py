@@ -47,6 +47,14 @@ class TestFuentesExternas(unittest.TestCase):
             with self.subTest(valor=valor), self.assertRaises(ValueError):
                 normalizar_wifi(valor)
 
+    def test_menu_vuelve_a_preguntar_si_se_pulsa_enter_vacio(self):
+        with patch("builtins.input", side_effect=["", "1"]):
+            self.assertEqual(elegir_fuente_menu(), "prueba_motos.mp4")
+
+    def test_menu_vuelve_a_preguntar_ante_opcion_desconocida(self):
+        with patch("builtins.input", side_effect=["9", "0"]):
+            self.assertIsNone(elegir_fuente_menu())
+
     def test_menu_solo_usb_externa(self):
         with patch("builtins.input", side_effect=["2", "1"]):
             self.assertEqual(elegir_fuente_menu(), "camara:1")

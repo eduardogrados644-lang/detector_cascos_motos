@@ -33,12 +33,12 @@ def resolver_archivo(texto: str) -> Path:
 
 
 def es_puntero_lfs(ruta: Path) -> bool:
-    return (
-        ruta.stat().st_size < 200
-        and ruta.open("rb").read(60).startswith(
+    if ruta.stat().st_size >= 200:
+        return False
+    with ruta.open("rb") as archivo:
+        return archivo.read(60).startswith(
             b"version https://git-lfs.github.com/spec/v1"
         )
-    )
 
 
 def muestras_video(ruta: Path, salto: int, max_muestras: int):
