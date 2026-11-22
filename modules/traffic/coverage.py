@@ -55,5 +55,7 @@ def resumen_cobertura(fotogramas: int, conteos: Mapping[str, int]) -> dict:
         "detecciones_sin_casco": sin_casco,
         "asociaciones": relaciones,
         "candidatos_para_revision": candidatos,
+        "observaciones_temporales_inciertas": int(conteos.get("estados_inciertos", 0)),
+        "contradicciones_temporales": int(conteos.get("contradicciones_temporales", 0)),
         "resultado_es_infraccion_confirmada": False,
     }

@@ -40,6 +40,15 @@ class TestCoberturaVial(unittest.TestCase):
         self.assertEqual(r["estado"], "asociaciones_experimentales_para_revision")
         self.assertFalse(r["resultado_es_infraccion_confirmada"])
 
+    def test_estado_cobertura_registra_incertidumbre_temporal(self):
+        r = resumen_cobertura(40, {
+            "motos": 30, "personas": 25, "relaciones": 10,
+            "estados_inciertos": 3, "contradicciones_temporales": 1,
+        })
+        self.assertEqual(r["observaciones_temporales_inciertas"], 3)
+        self.assertEqual(r["contradicciones_temporales"], 1)
+        self.assertFalse(r["resultado_es_infraccion_confirmada"])
+
     def test_cero_fotogramas(self):
         r = resumen_cobertura(0, {})
         self.assertEqual(r["estado"], "no_evaluable_sin_fotogramas")

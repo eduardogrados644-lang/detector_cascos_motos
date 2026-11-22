@@ -308,3 +308,36 @@ por fotograma y, opcionalmente, \`anotado_cascos.mp4\`. Se crea
 explícito SIN vinculación a motocicletas; esto NO confirma infracciones ni
 cuenta personas únicas. Los resultados y videos de evaluación quedan
 excluidos del control de versiones. No son un tercer proyecto.
+
+
+## Consistencia temporal de cascos en el modo vial integrado
+
+El modo \`--modo vial\` mantiene ahora **historias cortas por zona de cabeza
+relativa a una motocicleta**, sin reconocimiento facial ni identidad de
+personas. Cuando una región aparece como \`con_casco\` y \`sin_casco\`
+en los últimos 12 fotogramas analizados, su asociación pasa a **\`incierto\`**
+y se dibuja con un contorno amarillo para revisión humana.
+
+- Se conservan las cajas crudas del modelo y los conteos originales.
+- Se crea \`inconsistencias_cascos.csv\` con transición de clases, IDs
+  temporales y número de fotograma; sólo se guarda localmente.
+- La inconsistencia interrumpe la confirmación automática de candidatos
+  \`sin_casco\`, hasta que caduque la contradicción. Dos cabezas
+  detectadas simultáneamente conservan historiales distintos.
+- \`estado_cobertura.json\` ahora incluye conteos de contradicciones e
+  incertidumbres temporales.
+- **Limitación:** si el modelo clasifica una cabeza descubierta como
+  \`con_casco\` de forma consistente y sin ninguna detección previa
+  \`sin_casco\`, este filtro NO puede identificar el error. Tampoco crea
+  nuevas cajas ni garantiza separar a dos ocupantes solapados.
+- El modelo por defecto sigue siendo \`videos_revisados\`; el modo
+  \`--modo cascos\` y el apartado conductual no cambian.
+
+Validación pendiente en Windows:
+
+    python -m unittest discover -s tests -v
+    python iniciar_cascos.py --modo vial --fuente helmet.mp4 --guardar-video --sin-mostrar --max-fotogramas 120
+
+Revisar \`[CASCO INCIERTO]\` y el nuevo CSV, cotejando las cajas amarillas con
+el video fuente. Cero contradicciones no demuestra que los cascos estén bien
+clasificados.

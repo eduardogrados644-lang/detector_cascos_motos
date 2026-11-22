@@ -115,3 +115,18 @@ Pasar las pruebas unitarias, comprobar la descarga de Git LFS y ejecutar manualm
   no perfiles/identidades ni sanciones. El apartado conductual sigue separado.
 - Antes de fusionar en main: ejecutar ambos modos en Windows, revisar imágenes
   contra etiquetas humanas y probar cámaras externas.
+
+
+## Décima entrega: verificación temporal de clases por cabeza
+
+- Nueva \`modules/traffic/temporal_consistency.py\`: historial acotado de
+  clases \`con_casco/sin_casco\` por zona aproximada relativa a la moto.
+- Si ambas clases se alternan dentro de la ventana, muestra y cuenta
+  \`incierto\`, preservando cajas/observaciones originales y dejando
+  constancia en \`inconsistencias_cascos.csv\`.
+- No une dos cabezas simultáneas ni motos diferentes; reidentificación por
+  geometría con restricciones más estrictas cuando cambia el track ID.
+- **No** resuelve falsas etiquetas consistentes ni una persona COCO que
+  engloba a dos ocupantes; hará falta etiquetado por cabeza/modelo mejorado.
+- No cambia pesos ni umbrales, ni el módulo conductual. Probar en Windows
+  antes de fusionar con \`main\`.

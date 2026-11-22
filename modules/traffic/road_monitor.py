@@ -17,6 +17,7 @@ import cv2
 from ultralytics import YOLO
 
 from .coverage import resumen_cobertura
+from .temporal_consistency import ConsistenciaTemporalCabezas
 from .association import (
     ConfirmadorEventosViales,
     Objeto,
@@ -78,6 +79,7 @@ def dibujar(frame, motos, personas, cascos, relaciones, eventos, fotograma):
         "con_casco": (20, 175, 40),
         "sin_casco": (20, 20, 235),
         "placa": (140, 220, 220),
+        "incierto": (0, 220, 255),
     }
     for objeto in [*motos, *personas, *cascos]:
         x1, y1, x2, y2 = [round(v) for v in objeto.caja]
@@ -98,8 +100,19 @@ def dibujar(frame, motos, personas, cascos, relaciones, eventos, fotograma):
         color = (
             (20, 20, 235) if relacion.estado == "sin_casco"
             else (20, 175, 40) if relacion.estado == "con_casco"
+            else (0, 220, 255) if relacion.estado == "incierto"
             else (180, 180, 180)
         )
+        if relacion.estado == "incierto" and relacion.casco is not None:
+            # La caja original sigue visible, pero ya no debe interpretarse
+            # como casco verificado por una detección verde aislada.
+            h1, v1, h2, v2 = (round(v) for v in relacion.casco.caja)
+            cv2.rectangle(frame, (h1, v1), (h2, v2), color, 3)
+            cv2.putText(
+                frame, "CASCO INCIERTO - REVISAR",
+                (h1, min(frame.shape[0] - 10, v2 + 16)),
+                cv2.FONT_HERSHEY_SIMPLEX, 0.42, color, 2,
+            )
         cv2.putText(
             frame, etiqueta, (x1, min(frame.shape[0] - 12, y1 + 18)),
             cv2.FONT_HERSHEY_SIMPLEX, 0.40, color, 1,
@@ -151,6 +164,7 @@ def ejecutar(args) -> None:
 
     salida = crear_salida(RAIZ / "resultados" / "vial_integrado")
     confirmar = ConfirmadorEventosViales(args.confirmaciones)
+    consistencia = ConsistenciaTemporalCabezas()
     total = Counter()
     escritor_video = None
     fps_original = float(captura.get(cv2.CAP_PROP_FPS))
@@ -170,6 +184,14 @@ def ejecutar(args) -> None:
     )
     print("Solo se registran candidatos a revisar; no infracciones confirmadas.")
     print(f"Resultados: {salida}")
+    ruta_inconsistencias = salida / "inconsistencias_cascos.csv"
+    with ruta_inconsistencias.open("w", encoding="utf-8", newline="") as archivo:
+        csv.writer(archivo).writerow([
+            "timestamp_utc", "fuente", "fotograma",
+            "moto_track_id", "persona_track_id", "cabeza_track_id",
+            "zona_local_id", "clase_anterior", "clase_actual",
+            "confianza_actual", "estado",
+        ])
     ruta_duplicados = salida / "posibles_duplicados.csv"
     with ruta_duplicados.open("w", encoding="utf-8", newline="") as archivo_duplicados:
         csv.writer(archivo_duplicados).writerow([
@@ -246,7 +268,38 @@ def ejecutar(args) -> None:
                 )
                 motos = [o for o in objetos_viales if o.clase == "moto"]
                 personas = [o for o in objetos_viales if o.clase == "persona"]
-                relaciones = relacionar(motos, personas, objetos_cascos)
+                relaciones_originales = relacionar(motos, personas, objetos_cascos)
+                relaciones = consistencia.procesar(
+                    paso, numero, relaciones_originales
+                )
+                contradicciones = consistencia.contradicciones
+                total["contradicciones_temporales"] += len(contradicciones)
+                total["estados_inciertos"] += sum(
+                    r.estado == "incierto" for r in relaciones
+                )
+                if contradicciones:
+                    with ruta_inconsistencias.open(
+                        "a", encoding="utf-8", newline=""
+                    ) as archivo_inconsistencias:
+                        escritor_inconsistencias = csv.writer(archivo_inconsistencias)
+                        for cambio in contradicciones:
+                            escritor_inconsistencias.writerow([
+                                datetime.now(timezone.utc).isoformat(),
+                                args.fuente, cambio.fotograma,
+                                cambio.moto_id, cambio.persona_id,
+                                cambio.cabeza_id, cambio.zona_local_id,
+                                cambio.clase_anterior, cambio.clase_actual,
+                                round(cambio.confianza_actual, 4),
+                                "incierto_para_revision",
+                            ])
+                            print(
+                                f"[CASCO INCIERTO] Moto ID:{cambio.moto_id}, "
+                                f"cabeza ID:{cambio.cabeza_id}: "
+                                f"{cambio.clase_anterior} -> {cambio.clase_actual} "
+                                f"(frame {cambio.fotograma})"
+                            )
+                # Nunca convertir una zona incierta en protección verificada
+                # ni confirmar una alerta sin casco durante la contradicción.
                 eventos = confirmar.procesar(paso, numero, relaciones)
                 duplicados = confirmar.posibles_duplicados
                 total["posibles_duplicados"] += len(duplicados)
@@ -339,7 +392,9 @@ def ejecutar(args) -> None:
         f"Apariciones persona/moto: {total['personas']}/{total['motos']}; "
         f"asociaciones: {total['relaciones']}; "
         f"candidatos a revisar: {total['candidatos']}; "
-        f"posibles duplicados de seguimiento: {total['posibles_duplicados']}"
+        f"posibles duplicados de seguimiento: {total['posibles_duplicados']}; "
+        f"contradicciones temporales: {total['contradicciones_temporales']}; "
+        f"observaciones inciertas: {total['estados_inciertos']}"
     )
     print(
         "Detecciones casco/placa por clase: "
@@ -347,10 +402,11 @@ def ejecutar(args) -> None:
     )
     print(
         "Estados de asociaciones: "
-        + str({nombre: total[f"asociacion_{nombre}"] for nombre in ("con_casco", "sin_casco", "desconocido")})
+        + str({nombre: total[f"asociacion_{nombre}"] for nombre in ("con_casco", "sin_casco", "desconocido", "incierto")})
     )
     print(f"CSV: {salida / 'eventos.csv'}")
     print(f"Revisiones de duplicados: {ruta_duplicados}")
+    print(f"Revisiones de casco incierto: {ruta_inconsistencias}")
     cobertura = resumen_cobertura(paso, total)
     ruta_cobertura = salida / "estado_cobertura.json"
     with ruta_cobertura.open("w", encoding="utf-8") as archivo_cobertura:
