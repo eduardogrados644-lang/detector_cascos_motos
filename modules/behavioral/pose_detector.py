@@ -12,6 +12,7 @@ import cv2
 from ultralytics import YOLO
 
 from .events import DetectorEventos, Persona
+from .proximity import DetectorProximidad
 from modules.camera_sources import abrir_captura
 
 
@@ -75,6 +76,7 @@ def main() -> None:
     )
     parser.add_argument("--fuente", default="prueba_motos.mp4", help="video, camara:1 (USB externa), IP Webcam o RTSP")
     parser.add_argument("--modelo", default="yolo11n-pose.pt")
+    parser.add_argument("--modo", choices=("posturas", "proximidad"), default="posturas")
     parser.add_argument("--conf", type=float, default=0.45)
     parser.add_argument("--imgsz", type=int, default=320)
     parser.add_argument("--min-fotogramas", type=int, default=6)
@@ -84,21 +86,22 @@ def main() -> None:
     parser.add_argument("--guardar-video", action="store_true")
     parser.add_argument(
         "--csv",
-        default=str(RAIZ / "resultados" / "conductual" / "eventos.csv"),
+        default=None,
         help="Registro de candidatos; no guarda imágenes por defecto",
     )
     args = parser.parse_args()
 
     if not (0 < args.conf <= 1) or args.imgsz < 64 or args.max_fotogramas < 0:
         parser.error("Parámetros de confianza, imagen o límite inválidos")
-    detector = DetectorEventos(args.min_fotogramas, args.separacion_alertas)
+    detector = (DetectorProximidad(args.min_fotogramas, args.separacion_alertas)
+                if args.modo == "proximidad" else DetectorEventos(args.min_fotogramas, args.separacion_alertas))
     fuente = resolver_fuente(args.fuente)
     modelo = YOLO(args.modelo)
     if getattr(modelo, "task", None) != "pose":
         raise ValueError("El modelo conductual debe ser de tipo pose, no detect")
     camara = abrir_captura(fuente)
 
-    destino = Path(args.csv).expanduser()
+    destino = Path(args.csv if args.csv else (RAIZ / "resultados" / "conductual" / ("eventos_proximidad.csv" if args.modo == "proximidad" else "eventos.csv"))).expanduser()
     destino.parent.mkdir(parents=True, exist_ok=True)
     nuevo = not destino.exists() or destino.stat().st_size == 0
     escritor_video = None
@@ -111,7 +114,7 @@ def main() -> None:
             if anchura <= 0 or altura <= 0:
                 raise ValueError("La fuente de video no informa dimensiones válidas")
             salida = destino.parent / (
-                "resultado_posturas_"
+                ("resultado_proximidad_" if args.modo == "proximidad" else "resultado_posturas_")
                 + datetime.now(timezone.utc).strftime("%Y%m%d_%H%M%S_%f")
                 + ".mp4"
             )
@@ -128,7 +131,7 @@ def main() -> None:
             csv_writer = csv.writer(archivo)
             if nuevo:
                 csv_writer.writerow(
-                    ["timestamp_utc", "fuente", "fotograma", "track_id", "tipo", "estado"]
+                    ["timestamp_utc", "fuente", "fotograma", "track_ids" if args.modo == "proximidad" else "track_id", "tipo", "estado"]
                 )
 
             while True:
@@ -154,22 +157,22 @@ def main() -> None:
                             instante,
                             args.fuente,
                             alerta.fotograma,
-                            alerta.track_id,
+                            f"{alerta.track_ids[0]}|{alerta.track_ids[1]}" if args.modo == "proximidad" else alerta.track_id,
                             alerta.tipo,
                             "candidato_para_revision",
                         ]
                     )
                     archivo.flush()
-                    print(
-                        f"[REVISAR] Fotograma {fotograma} ID {alerta.track_id}: "
-                        "postura horizontal persistente (no caída confirmada)"
-                    )
+                    if args.modo == "proximidad":
+                        print(f"[REVISAR PROXIMIDAD] Fotograma {fotograma}; IDs {alerta.track_ids}: cercanía persistente, NO pelea confirmada")
+                    else:
+                        print(f"[REVISAR] Fotograma {fotograma} ID {alerta.track_id}: postura horizontal persistente (no caída confirmada)")
 
                 if args.mostrar or args.guardar_video:
                     vista = resultado.plot()
                     if alertas:
                         cv2.putText(
-                            vista, "REVISAR POSTURA - NO CONFIRMADA",
+                            vista, ("PROXIMIDAD - NO VIOLENCIA CONFIRMADA" if args.modo == "proximidad" else "REVISAR POSTURA - NO CONFIRMADA"),
                             (12, 35), cv2.FONT_HERSHEY_SIMPLEX,
                             0.6, (0, 0, 255), 2,
                         )
@@ -192,7 +195,7 @@ def main() -> None:
         if args.mostrar:
             cv2.destroyAllWindows()
 
-    print(f"Fin. {fotograma} fotogramas. Archivo de eventos: {destino}")
+    print(f"Fin. Modo {args.modo}; {fotograma} fotogramas. Archivo de eventos: {destino}")
 
 
 if __name__ == "__main__":

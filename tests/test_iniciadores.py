@@ -50,6 +50,27 @@ class PruebasIniciadores(unittest.TestCase):
         self.assertNotIn("--mostrar", comando)
         self.assertEqual(comando[-2:], ["--fuente", "camara:1"])
 
+    def test_proximidad_usa_pose_sin_pesos_viales(self):
+        comando = iniciar_intencion.construir_comando_demo(
+            "helmet.mp4", mostrar=False, guardar_video=True,
+            max_fotogramas=60, modo="proximidad",
+        )
+        self.assertIn("modules.behavioral.pose_detector", comando)
+        self.assertEqual(comando[comando.index("--modo") + 1], "proximidad")
+        self.assertIn("--guardar-video", comando)
+        self.assertNotIn("--mostrar", comando)
+        self.assertNotIn("best.pt", " ".join(comando))
+
+    def test_iniciador_modo_proximidad(self):
+        with patch("iniciar_intencion.subprocess.run") as ejecutor:
+            ejecutor.return_value.returncode = 0
+            resultado = iniciar_intencion.main([
+                "--demo-proximidad", "--fuente", "helmet.mp4",
+                "--max-fotogramas", "30", "--sin-mostrar",
+            ])
+        self.assertEqual(resultado, 0)
+        self.assertIn("proximidad", ejecutor.call_args.args[0])
+
     def test_validaciones_argumentos(self):
         with self.assertRaises(ValueError):
             iniciar_cascos.construir_comando("", stride=3)
@@ -57,6 +78,8 @@ class PruebasIniciadores(unittest.TestCase):
             iniciar_cascos.construir_comando("archivo.mp4", stride=0)
         with self.assertRaises(ValueError):
             iniciar_intencion.construir_comando_demo("", max_fotogramas=5)
+        with self.assertRaises(ValueError):
+            iniciar_intencion.construir_comando_demo("helmet.mp4", modo="violencia")
 
 
 if __name__ == "__main__":
