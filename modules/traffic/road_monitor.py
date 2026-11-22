@@ -357,7 +357,7 @@ def ejecutar(args) -> None:
         json.dump(cobertura, archivo_cobertura, indent=2, ensure_ascii=False)
     print(f"ESTADO DE COBERTURA VIAL: {cobertura['estado']}")
     print(f"AVISO: {cobertura['detalle']}")
-    print(f"Informe de cobertura: {ruta_cobertura}"
+    print(f"Informe de cobertura: {ruta_cobertura}")
 
 
 def main() -> None:
