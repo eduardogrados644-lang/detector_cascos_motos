@@ -7,6 +7,8 @@ DATOS = ("dataset", "dataset_externo", "dataset_ampliado")
 SCRIPTS = (
     "detectar.py", "detectar_refinado.py", "camara_zoom.py", "entrenar.py",
     "modules/traffic/vehicle_detector.py",
+    "modules/traffic/road_monitor.py",
+    "modules/traffic/association.py",
     "modules/behavioral/pose_detector.py",
 )
 

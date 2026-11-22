@@ -45,3 +45,19 @@
 ## Condición para llevar estas mejoras a main
 
 Pasar las pruebas unitarias, comprobar la descarga de Git LFS y ejecutar manualmente al menos una imagen/video y cámara para los dos módulos sobre el equipo destino. No se ha realizado aún esa comprobación real en la computadora del usuario.
+
+
+## Segunda entrega: seguimiento y asociación vial conservadora
+
+- Se añade modules/traffic/association.py, con hipótesis geométricas independientes de YOLO y pruebas unitarias sin hardware.
+- Se añade modules/traffic/road_monitor.py, que lee una única fuente de video, ejecuta COCO y casco sobre el mismo fotograma y usa ByteTrack para persona/moto.
+- Una persona no se asigna a dos motocicletas cuando la escena es ambigua y una etiqueta de casco no se reutiliza para personas diferentes.
+- Solo genera candidatos con track ID de moto y persona estables y 4 observaciones consecutivas sin casco, una vez por moto durante la ejecución. No son infracciones verificadas.
+- El CSV se guarda localmente; el video anotado es optativo. Se mantiene la independencia del módulo conductual.
+
+### Validaciones todavía necesarias
+
+1. Probar el módulo integrado en videos diferentes y revisar las cajas dibujadas.
+2. Medir falsos positivos de asociación; la cercanía espacial no implica conducción y las etiquetas del dataset pueden representar regiones distintas de una cabeza.
+3. Ajustar umbrales según evidencias y probar vehículos con varios ocupantes y peatones cercanos.
+4. Evaluar consumo de CPU y fluidez antes de añadirlo a main.
