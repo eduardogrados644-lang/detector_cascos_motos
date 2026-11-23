@@ -81,7 +81,7 @@ def main(argv=None):
     parser=argparse.ArgumentParser(description="Seguimiento de personas, sin clasificar violencia")
     parser.add_argument("--fuente",required=True)
     parser.add_argument("--modelo",default="yolo11n.pt")
-    parser.add_argument("--rastreador",choices=("botsort.yaml","bytetrack.yaml"),
+    parser.add_argument("--rastreador",choices=('botsort.yaml','bytetrack.yaml','config/trackers/bytetrack_buffer60.yaml'),
                         default="botsort.yaml")
     parser.add_argument("--imgsz",type=int,default=640)
     parser.add_argument("--conf",type=float,default=0.20)

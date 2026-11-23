@@ -1,0 +1,11 @@
+# Experimento de pista perdida para la rama de trabajo INTENCIONES.
+# Único cambio respecto a bytetrack.yaml: track_buffer 30 -> 60.
+# Usar el mismo video, conf, imgsz y persistencia-visual que control.
+# No demuestra identidad ni recupera una detección inexistente.
+tracker_type: bytetrack
+track_high_thresh: 0.25
+track_low_thresh: 0.1
+new_track_thresh: 0.25
+track_buffer: 60
+match_thresh: 0.8
+fuse_score: True

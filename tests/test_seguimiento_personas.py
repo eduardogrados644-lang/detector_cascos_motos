@@ -47,6 +47,19 @@ class PruebasSeguimientoVisual(unittest.TestCase):
             MemoriaCajas(-1)
         with self.assertRaises(ValueError):
             MemoriaCajas().procesar(1,[caja(1,(10,10,0,20))])
+
+    def test_configuracion_experimental_tiene_solo_buffer_ampliado(self):
+        from pathlib import Path
+        archivo=Path(__file__).resolve().parents[1]/"config"/"trackers"/"bytetrack_buffer60.yaml"
+        datos=dict(line.split(":",1) for line in archivo.read_text().splitlines()
+                   if ":" in line and not line.strip().startswith("#"))
+        self.assertEqual(datos["track_buffer"].strip(),"60")
+        self.assertEqual(datos["tracker_type"].strip(),"bytetrack")
+        self.assertEqual(datos["track_high_thresh"].strip(),"0.25")
+        self.assertEqual(datos["track_low_thresh"].strip(),"0.1")
+        self.assertEqual(datos["new_track_thresh"].strip(),"0.25")
+        self.assertEqual(datos["match_thresh"].strip(),"0.8")
+
     def test_iou(self):
         self.assertEqual(iou((0,0,10,10),(0,0,10,10)),1)
         self.assertEqual(iou((0,0,10,10),(20,20,30,30)),0)
