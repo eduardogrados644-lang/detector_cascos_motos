@@ -10,6 +10,9 @@ Esta carpeta organiza referencias y protocolos para **analizar acciones observab
 - `evaluacion/kth/README.md`: procedencia, resolución y límites de los archivos KTH.
 - `evaluacion/ut_interaction/manifest.csv`: 3 muestras AVI de UT-Interaction convertidas localmente a MP4; **solo se registra catálogo** en GitHub.
 - `evaluacion/ut_interaction/README.md`: características, licencias y limitaciones de los videos de muestra.
+- `evaluacion/behave/manifest.csv`: secuencias BEHAVE de Edimburgo, convertidas localmente a MP4 (640×480, 25 FPS).
+- `evaluacion/behave/fragmentos_manifest.csv`: cuatro tramos de 8–16 segundos referenciados a las anotaciones oficiales, sin subir videos al repositorio.
+- `evaluacion/behave/README.md`: acceso a los clips, limitaciones y pruebas de interacción.
 - `../docs/FUENTES_INTERACCIONES_BEHAVE.md`: BEHAVE como reemplazo de TV Human Interactions de Oxford, cuya descarga oficial fue retirada.
 - `entrenamiento/README.md`: espacio para futuros conjuntos de **entrenamiento**, actualmente sin videos.
 - `../docs/FLUJO_VIDEOS_INTENCIONES.md`: instrucciones de conversión, clasificación y autorización.

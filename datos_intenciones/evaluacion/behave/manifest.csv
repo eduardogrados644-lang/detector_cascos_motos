@@ -1,0 +1,3 @@
+id,rol,original_avi,mp4_local,fuente_oficial,duracion_s,fps,resolucion,num_fotogramas,bytes_mp4,sha256_mp4,sha256_avi_original,permiso_redistribuir_en_github
+1-11200,evaluacion,1-11200.avi,1-11200.mp4,https://groups.inf.ed.ac.uk/vision/DATASETS/BEHAVEDATA/INTERACTIONS/1-11200.avi,448.00,25/1,640x480,11200,9381854,882d3d5327aadc20dea4083ea6db6b8b5792fb5c2a4326ff9ba23876a05f92db,000e23b7b2fde9e211802fd825b9f864c9d7312b20e21fa63962c3c4da67121c,no_verificado
+47300-58400,evaluacion,47300-58400.avi,47300-58400.mp4,https://groups.inf.ed.ac.uk/vision/DATASETS/BEHAVEDATA/INTERACTIONS/47300-58400.avi,444.04,25/1,640x480,11101,8360434,d26366210e1d94f5a7cc01938f80a406e1651f6d254d1aacbd87eab57b4ea939,ea95afb2d0726e9ecdeb61a7c566ca96ad96307f5c57dcf45a06d6b196adb109,no_verificado
