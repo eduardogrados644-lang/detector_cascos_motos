@@ -16,10 +16,67 @@ from ultralytics import YOLO
 from .events import DetectorEventos, Persona
 from .proximity import DetectorProximidad
 from .arm_motion import DetectorMovimientosBrazos
+from .visual_layout import dimensiones_anotadas, texto_evento_resumido
 from modules.camera_sources import abrir_captura
 
 
 RAIZ = Path(__file__).resolve().parents[2]
+
+
+def renderizar_vista(resultado, personas: list[Persona], alertas: list, modo: str):
+    """Muestra el esqueleto sin taparlo con rótulos gigantes.
+
+    El modelo recibe siempre el fotograma ORIGINAL. Sólo se amplía la vista
+    anotada; esto no aumenta la precisión de los puntos de YOLO Pose.
+    """
+    vista = resultado.plot(
+        labels=False, conf=False, line_width=1, kpt_radius=1,
+    )
+    altura_original, ancho_original = vista.shape[:2]
+    ancho, alto, panel = dimensiones_anotadas(ancho_original, altura_original)
+    if (ancho, alto) != (ancho_original, altura_original):
+        vista = cv2.resize(vista, (ancho, alto), interpolation=cv2.INTER_LINEAR)
+
+    escala_x = ancho / ancho_original
+    escala_y = alto / altura_original
+    for persona in personas:
+        if persona.track_id is None:
+            continue
+        x1, y1 = persona.caja[:2]
+        posicion = (
+            max(3, min(ancho - 54, int(x1 * escala_x))),
+            max(16, min(alto - 4, int(y1 * escala_y) - 4)),
+        )
+        cv2.putText(
+            vista, f"ID {persona.track_id}", posicion,
+            cv2.FONT_HERSHEY_SIMPLEX, 0.45, (255, 255, 255), 2,
+        )
+
+    # Un panel fijo fuera del cuerpo evita tapar brazos y muñecas.
+    vista = cv2.copyMakeBorder(
+        vista, 0, panel, 0, 0, cv2.BORDER_CONSTANT, value=(25, 25, 25),
+    )
+    titulo = {
+        "posturas": "POSTURA: observaciones para revision",
+        "proximidad": "PROXIMIDAD: no indica pelea",
+        "brazos": "BRAZOS: no indica agresion",
+    }[modo]
+    cv2.putText(
+        vista, titulo, (10, alto + 20),
+        cv2.FONT_HERSHEY_SIMPLEX, 0.52, (255, 255, 255), 1,
+    )
+    for indice, evento in enumerate(alertas[:4]):
+        mensaje = texto_evento_resumido(evento, modo)
+        cv2.putText(
+            vista, mensaje, (10, alto + 40 + indice * 18),
+            cv2.FONT_HERSHEY_SIMPLEX, 0.43, (150, 215, 255), 1,
+        )
+    if not alertas:
+        cv2.putText(
+            vista, "Sin avisos nuevos en este fotograma", (10, alto + 40),
+            cv2.FONT_HERSHEY_SIMPLEX, 0.43, (200, 200, 200), 1,
+        )
+    return vista
 
 
 def resolver_fuente(texto: str):
@@ -157,11 +214,14 @@ def main() -> None:
                 + datetime.now(timezone.utc).strftime("%Y%m%d_%H%M%S_%f")
                 + ".mp4"
             )
+            ancho_vista, alto_vista, panel_vista = dimensiones_anotadas(
+                anchura, altura
+            )
             escritor_video = cv2.VideoWriter(
                 str(salida),
                 cv2.VideoWriter_fourcc(*"mp4v"),
                 fps,
-                (anchura, altura),
+                (ancho_vista, alto_vista + panel_vista),
             )
             if not escritor_video.isOpened():
                 raise OSError(f"No se pudo crear el video: {salida}")
@@ -228,15 +288,7 @@ def main() -> None:
                     and capturas_guardadas < max_capturas
                 )
                 if args.mostrar or args.guardar_video or capturar:
-                    vista = resultado.plot()
-                    if alertas:
-                        cv2.putText(
-                            vista, ({"posturas": "REVISAR POSTURA - NO CONFIRMADA",
-                                   "proximidad": "PROXIMIDAD - NO VIOLENCIA CONFIRMADA",
-                                   "brazos": "MOVIMIENTO DE BRAZO - REVISAR"}[args.modo]),
-                            (12, 35), cv2.FONT_HERSHEY_SIMPLEX,
-                            0.6, (0, 0, 255), 2,
-                        )
+                    vista = renderizar_vista(resultado, personas, alertas, args.modo)
                     if capturar:
                         if carpeta_capturas is None:
                             carpeta_capturas = destino.parent / (
@@ -244,23 +296,6 @@ def main() -> None:
                                 + datetime.now(timezone.utc).strftime("%Y%m%d_%H%M%S_%f")
                             )
                             carpeta_capturas.mkdir(parents=True, exist_ok=False)
-                        # Metadatos visibles: sólo IDs temporales y observaciones.
-                        for i, evento in enumerate(alertas[:3]):
-                            if args.modo == "brazos":
-                                detalle = (
-                                    f"ID {evento.track_id} {evento.brazo} {evento.tipo}"
-                                )
-                            elif args.modo == "proximidad":
-                                detalle = (
-                                    f"IDs {evento.track_ids[0]}-{evento.track_ids[1]} "
-                                    "proximidad_persistente"
-                                )
-                            else:
-                                detalle = f"ID {evento.track_id} {evento.tipo}"
-                            cv2.putText(
-                                vista, detalle[:90], (12, 65 + i * 26),
-                                cv2.FONT_HERSHEY_SIMPLEX, 0.47, (0, 0, 255), 2,
-                            )
                         nombre = carpeta_capturas / f"fotograma_{fotograma:06d}.jpg"
                         if not cv2.imwrite(str(nombre), vista):
                             raise OSError(f"No se pudo guardar la captura: {nombre}")
