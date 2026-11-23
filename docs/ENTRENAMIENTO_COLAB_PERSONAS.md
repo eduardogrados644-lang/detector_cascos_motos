@@ -2,6 +2,18 @@
 
 Objetivo: preparar un modelo **Detect** específico para el módulo experimental de **Intenciones**. Este procedimiento **no** modifica el módulo vial ni confunde proximidad con violencia.
 
+## Preparación automática de datos (antes de entrenar)
+
+Para generar un primer conjunto etiquetado en Google Drive **sin subir imágenes manualmente**, abre:
+
+[**Preparar dataset de personas — Colab**](https://colab.research.google.com/github/eduardogrados644-lang/detector_cascos_motos/blob/mejoras-modulos-vial-conductual/entrenamientos_colab/preparar_dataset_personas.ipynb)
+
+El cuaderno descarga **solo** hasta 260 imágenes `train` y 60 imágenes `validation` de **Open Images V7** que incluyen recuadros de la clase `Person`, las transforma a `0 x y w h` para YOLO y las coloca directamente en `datasets/personas_v1` de Drive. Guarda un manifiesto con los IDs originales y las condiciones de licencia. FiftyOne puede necesitar tiempo de instalación/descarga; no hace falta GPU durante la preparación.
+
+Fuentes de información y condiciones: [Open Images V7 oficial](https://storage.googleapis.com/openimages/web/factsfigures_v7.html), [descarga parcial con FiftyOne](https://docs.voxel51.com/dataset_zoo/datasets/open_images_v7.html). Las imágenes se **listan** como CC BY 2.0 y las anotaciones son CC BY 4.0; Google advierte que se verifique individualmente el estado de las imágenes antes de redistribuirlas. **No subir el dataset ni los pesos a GitHub automáticamente**. Revisa etiquetas incompletas visualmente, separa escenas de evaluación y no interpretes 320 imágenes como validación de desempeño real.
+
+Una vez que el nuevo cuaderno muestre `Exportación finalizada`, regresa a `entrenar_personas.ipynb`, ejecuta la celda que monta Drive y luego la de validación: ya deberían existir imágenes y etiquetas YOLO en `images/train`, `images/val`, `labels/train`, `labels/val`.
+
 ## Cómo ejecutar
 
 1. Abre el cuaderno de [Colab desde GitHub](https://colab.research.google.com/github/eduardogrados644-lang/detector_cascos_motos/blob/mejoras-modulos-vial-conductual/entrenamientos_colab/entrenar_personas.ipynb).
