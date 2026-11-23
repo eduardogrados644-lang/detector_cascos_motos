@@ -1,0 +1,4 @@
+id,accion_observable,rol,archivo_local_mp4,origen_avi,fuente_original_url,duracion_segundos,fps,resolucion,bytes_mp4,sha256_mp4,permiso_publicacion_en_github
+kth_15_walking,caminar,evaluacion,person15_walking_d1_uncomp.mp4,person15_walking_d1_uncomp.avi,https://www.csc.kth.se/cvap/actions/person15_walking_d1_uncomp.avi,29.64,25,160x120,1069625,f27f2ee4162b6da0773e84072ae1e4331eee5a8e1d514ba614259a9a6f9cb3dd,no_confirmado
+kth_15_handwaving,saludar,evaluacion,person15_handwaving_d1_uncomp.mp4,person15_handwaving_d1_uncomp.avi,https://www.csc.kth.se/cvap/actions/person15_handwaving_d1_uncomp.avi,23.24,25,160x120,668698,6f1a77f0ca1ffc2294f26bb340aac31d742747d3c850eff8fbfc0a4a7f26f93e,no_confirmado
+kth_15_boxing,boxeo_practica,evaluacion,person15_boxing_d1_uncomp.mp4,person15_boxing_d1_uncomp.avi,https://www.csc.kth.se/cvap/actions/person15_boxing_d1_uncomp.avi,16.32,25,160x120,473538,1b81ca5d03031938f0cb061c07dca7393591227b16f174118b9ee5b3b5e5d0c7,no_confirmado

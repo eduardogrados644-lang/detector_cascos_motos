@@ -46,3 +46,15 @@ resultados/vehiculos/
 resultados/vial_integrado/
 yolo11n-pose.pt
 resultados/solo_cascos/
+
+# Videos de «Intenciones»: se conservan localmente salvo permiso expreso de publicación
+# Los metadatos y enlaces a su origen SI se versionan en GitHub.
+datos_intenciones/**/*.avi
+datos_intenciones/**/*.mp4
+datos_intenciones/**/*.mov
+datos_intenciones/**/*.mkv
+datos_intenciones/**/*.webm
+datos_intenciones/**/*.jpg
+datos_intenciones/**/*.jpeg
+datos_intenciones/**/*.png
+datos_intenciones/**/*.zip
