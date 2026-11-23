@@ -20,6 +20,7 @@ def mostrar_estado() -> None:
     print("Estado: EXPERIMENTAL, desarrollo especializado pendiente.")
     print("Disponible: prueba de posturas horizontales con YOLO Pose.")
     print("Disponible: proximidad persistente entre personas; NO es pelea.")
+    print("Disponible: brazos elevados y desplazamientos aparentes (experimental).")
     print("Pendiente: modelos validados de armas, objetos y acciones violentas.")
     print("ATENCIÓN: una postura u objeto no revela la intención de una persona.")
     print("Los resultados nunca son acusaciones ni eventos confirmados.")
@@ -35,14 +36,14 @@ def construir_comando_demo(
     """Sólo lanza la demostración conductual, nunca el detector de cascos."""
     if not fuente.strip() or max_fotogramas < 0:
         raise ValueError("Fuente o número de fotogramas inválidos")
-    if modo not in ("posturas", "proximidad"):
+    if modo not in ("posturas", "proximidad", "brazos"):
         raise ValueError("Modo conductual inválido")
     cmd = [
         sys.executable, "-m", "modules.behavioral.pose_detector",
         "--fuente", validar_fuente(fuente),
     ]
-    if modo == "proximidad":
-        cmd.extend(["--modo", "proximidad"])
+    if modo in ("proximidad", "brazos"):
+        cmd.extend(["--modo", modo])
     if mostrar:
         cmd.append("--mostrar")
     if guardar_video:
@@ -62,6 +63,7 @@ def main(argv: list[str] | None = None) -> int:
         help="Ejecutar sólo la demostración actual de poses; NO detecta armas/violencia",
     )
     demos.add_argument("--demo-proximidad", action="store_true", help="Cercanía persistente, no violencia")
+    demos.add_argument("--demo-brazos", action="store_true", help="Movimientos aparentes de brazos, no agresión")
     fuentes = parser.add_mutually_exclusive_group()
     fuentes.add_argument("--fuente", help="Archivo de video o URL RTSP/MJPEG")
     fuentes.add_argument(
@@ -79,18 +81,21 @@ def main(argv: list[str] | None = None) -> int:
     if args.estado:
         return 0
     try:
-        demo = args.demo_posturas or args.demo_proximidad
-        modo = "proximidad" if args.demo_proximidad else "posturas"
+        demo = args.demo_posturas or args.demo_proximidad or args.demo_brazos
+        modo = ("brazos" if args.demo_brazos else
+                "proximidad" if args.demo_proximidad else "posturas")
         if not demo:
             print("\n1. Probar el prototipo de posturas (experimental)")
             print("2. Observar proximidad persistente (no significa pelea)")
+            print("3. Observar brazos elevados y movimientos aparentes")
             print("0. Salir sin iniciar análisis")
             opcion = input("Opción: ").strip()
             if opcion == "0":
                 return 0
-            if opcion not in ("1", "2"):
+            if opcion not in ("1", "2", "3"):
                 raise ValueError("Opción no válida")
-            modo = "proximidad" if opcion == "2" else "posturas"
+            modo = ("brazos" if opcion == "3" else
+                    "proximidad" if opcion == "2" else "posturas")
             demo = True
         if demo:
             fuente = seleccionar_fuente(args.fuente, args.usb, args.wifi)
@@ -104,7 +109,9 @@ def main(argv: list[str] | None = None) -> int:
                 max_fotogramas=args.max_fotogramas,
                 modo=modo,
             )
-            print("\nIniciando prueba de proximidad, NO violencia." if modo == "proximidad" else "\nIniciando sólo la prueba de posturas.")
+            print({"posturas": "\nIniciando sólo la prueba de posturas.",
+                   "proximidad": "\nIniciando prueba de proximidad, NO violencia.",
+                   "brazos": "\nIniciando prueba de movimientos de brazos, NO agresión."}[modo])
             print("Fuente seleccionada:", fuente)
             if fuente.startswith("camara:"):
                 print("AVISO: verifica que el índice corresponda a la USB externa.")

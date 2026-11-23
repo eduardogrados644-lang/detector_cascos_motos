@@ -5,6 +5,8 @@ solo crea un candidato de revisión si persiste en un track identificado.
 """
 import argparse
 import csv
+import time
+from math import isfinite
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -13,6 +15,7 @@ from ultralytics import YOLO
 
 from .events import DetectorEventos, Persona
 from .proximity import DetectorProximidad
+from .arm_motion import DetectorMovimientosBrazos
 from modules.camera_sources import abrir_captura
 
 
@@ -76,7 +79,7 @@ def main() -> None:
     )
     parser.add_argument("--fuente", default="prueba_motos.mp4", help="video, camara:1 (USB externa), IP Webcam o RTSP")
     parser.add_argument("--modelo", default="yolo11n-pose.pt")
-    parser.add_argument("--modo", choices=("posturas", "proximidad"), default="posturas")
+    parser.add_argument("--modo", choices=("posturas", "proximidad", "brazos"), default="posturas")
     parser.add_argument("--conf", type=float, default=0.45)
     parser.add_argument("--imgsz", type=int, default=320)
     parser.add_argument("--min-fotogramas", type=int, default=6)
@@ -93,15 +96,30 @@ def main() -> None:
 
     if not (0 < args.conf <= 1) or args.imgsz < 64 or args.max_fotogramas < 0:
         parser.error("Parámetros de confianza, imagen o límite inválidos")
-    detector = (DetectorProximidad(args.min_fotogramas, args.separacion_alertas)
-                if args.modo == "proximidad" else DetectorEventos(args.min_fotogramas, args.separacion_alertas))
+    detector = (
+        DetectorProximidad(args.min_fotogramas, args.separacion_alertas)
+        if args.modo == "proximidad"
+        else DetectorMovimientosBrazos(
+            min_elevados=max(2, args.min_fotogramas),
+            separacion_alertas=args.separacion_alertas,
+        ) if args.modo == "brazos"
+        else DetectorEventos(args.min_fotogramas, args.separacion_alertas)
+    )
     fuente = resolver_fuente(args.fuente)
     modelo = YOLO(args.modelo)
     if getattr(modelo, "task", None) != "pose":
         raise ValueError("El modelo conductual debe ser de tipo pose, no detect")
     camara = abrir_captura(fuente)
 
-    destino = Path(args.csv if args.csv else (RAIZ / "resultados" / "conductual" / ("eventos_proximidad.csv" if args.modo == "proximidad" else "eventos.csv"))).expanduser()
+    nombre_csv = {"posturas": "eventos.csv",
+                  "proximidad": "eventos_proximidad.csv",
+                  "brazos": "eventos_brazos.csv"}[args.modo]
+    destino = Path(args.csv if args.csv else RAIZ / "resultados" / "conductual" / nombre_csv).expanduser()
+    fps_fuente = camara.get(cv2.CAP_PROP_FPS)
+    if not isfinite(fps_fuente) or fps_fuente <= 0:
+        fps_fuente = 20.0
+    es_archivo_local = isinstance(fuente, str) and Path(fuente).is_file()
+    inicio_reloj = time.monotonic()
     destino.parent.mkdir(parents=True, exist_ok=True)
     nuevo = not destino.exists() or destino.stat().st_size == 0
     escritor_video = None
@@ -114,7 +132,9 @@ def main() -> None:
             if anchura <= 0 or altura <= 0:
                 raise ValueError("La fuente de video no informa dimensiones válidas")
             salida = destino.parent / (
-                ("resultado_proximidad_" if args.modo == "proximidad" else "resultado_posturas_")
+                {"posturas": "resultado_posturas_",
+                 "proximidad": "resultado_proximidad_",
+                 "brazos": "resultado_brazos_"}[args.modo]
                 + datetime.now(timezone.utc).strftime("%Y%m%d_%H%M%S_%f")
                 + ".mp4"
             )
@@ -149,7 +169,17 @@ def main() -> None:
                     verbose=False,
                 )[0]
                 personas = extraer_personas(resultado)
-                alertas = detector.procesar(fotograma, personas)
+                if args.modo == "brazos":
+                    # Usar reloj de video para archivos y monotónico para cámaras.
+                    if es_archivo_local:
+                        pos_ms = camara.get(cv2.CAP_PROP_POS_MSEC)
+                        tiempo_s = (pos_ms / 1000.0 if isfinite(pos_ms) and pos_ms > 0
+                                    else fotograma / fps_fuente)
+                    else:
+                        tiempo_s = time.monotonic() - inicio_reloj
+                    alertas = detector.procesar(fotograma, personas, tiempo_s)
+                else:
+                    alertas = detector.procesar(fotograma, personas)
                 for alerta in alertas:
                     instante = datetime.now(timezone.utc).isoformat()
                     csv_writer.writerow(
@@ -158,13 +188,17 @@ def main() -> None:
                             args.fuente,
                             alerta.fotograma,
                             f"{alerta.track_ids[0]}|{alerta.track_ids[1]}" if args.modo == "proximidad" else alerta.track_id,
-                            alerta.tipo,
+                            (f"{alerta.tipo}:{alerta.brazo}" if args.modo == "brazos"
+                             else alerta.tipo),
                             "candidato_para_revision",
                         ]
                     )
                     archivo.flush()
                     if args.modo == "proximidad":
                         print(f"[REVISAR PROXIMIDAD] Fotograma {fotograma}; IDs {alerta.track_ids}: cercanía persistente, NO pelea confirmada")
+                    elif args.modo == "brazos":
+                        print(f"[REVISAR BRAZO] Fotograma {fotograma}; ID {alerta.track_id}, "
+                              f"{alerta.brazo}: {alerta.tipo} (NO agresión confirmada)")
                     else:
                         print(f"[REVISAR] Fotograma {fotograma} ID {alerta.track_id}: postura horizontal persistente (no caída confirmada)")
 
@@ -172,7 +206,9 @@ def main() -> None:
                     vista = resultado.plot()
                     if alertas:
                         cv2.putText(
-                            vista, ("PROXIMIDAD - NO VIOLENCIA CONFIRMADA" if args.modo == "proximidad" else "REVISAR POSTURA - NO CONFIRMADA"),
+                            vista, ({"posturas": "REVISAR POSTURA - NO CONFIRMADA",
+                                   "proximidad": "PROXIMIDAD - NO VIOLENCIA CONFIRMADA",
+                                   "brazos": "MOVIMIENTO DE BRAZO - REVISAR"}[args.modo]),
                             (12, 35), cv2.FONT_HERSHEY_SIMPLEX,
                             0.6, (0, 0, 255), 2,
                         )

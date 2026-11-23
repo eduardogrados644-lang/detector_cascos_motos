@@ -71,6 +71,23 @@ class PruebasIniciadores(unittest.TestCase):
         self.assertEqual(resultado, 0)
         self.assertIn("proximidad", ejecutor.call_args.args[0])
 
+    def test_comando_brazos_reutiliza_pose_y_no_cascos(self):
+        cmd = iniciar_intencion.construir_comando_demo(
+            "prueba_motos.mp4", modo="brazos", guardar_video=True, mostrar=False,
+        )
+        self.assertEqual(cmd[cmd.index("--modo") + 1], "brazos")
+        self.assertIn("modules.behavioral.pose_detector", cmd)
+        self.assertNotIn("--modelo-cascos", cmd)
+
+    def test_brazos_lanzador_sin_abrir_camara(self):
+        with patch("iniciar_intencion.subprocess.run") as ejecutor:
+            ejecutor.return_value.returncode = 0
+            codigo = iniciar_intencion.main([
+                "--demo-brazos", "--fuente", "helmet.mp4", "--sin-mostrar",
+            ])
+        self.assertEqual(codigo, 0)
+        self.assertIn("brazos", ejecutor.call_args.args[0])
+
     def test_validaciones_argumentos(self):
         with self.assertRaises(ValueError):
             iniciar_cascos.construir_comando("", stride=3)
