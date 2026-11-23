@@ -128,6 +128,49 @@ class PruebasIniciadores(unittest.TestCase):
                 "helmet.mp4", modo="proximidad", filtro_brazos=True,
             )
 
+    def test_configuracion_pose_de_behave_se_envia_al_detector(self):
+        cmd = iniciar_intencion.construir_comando_demo(
+            "datos_intenciones/evaluacion/behave/fragmentos/01_aproximacion_42s_52s.mp4",
+            modo="proximidad", mostrar=False, guardar_video=True,
+            imgsz=640, conf=0.20, max_fotogramas=250,
+        )
+        self.assertEqual(cmd[cmd.index("--imgsz") + 1], "640")
+        self.assertEqual(cmd[cmd.index("--conf") + 1], "0.2")
+        self.assertIn("--guardar-video", cmd)
+        self.assertNotIn("--mostrar", cmd)
+        self.assertNotIn("modules.traffic", " ".join(cmd))
+
+    def test_pose_conserva_parametros_originales_si_no_se_indican(self):
+        cmd = iniciar_intencion.construir_comando_demo(
+            "helmet.mp4", modo="proximidad", mostrar=False,
+        )
+        self.assertNotIn("--imgsz", cmd)
+        self.assertNotIn("--conf", cmd)
+
+    def test_parametros_pose_rechazan_nan_inf_y_valores_invalidos(self):
+        for size in (0, 32, -128, 320.5, True):
+            with self.subTest(size=size), self.assertRaises(ValueError):
+                iniciar_intencion.construir_comando_demo(
+                    "helmet.mp4", imgsz=size,
+                )
+        for confidence in (0, -0.1, 1.01, float("nan"), float("inf")):
+            with self.subTest(confidence=confidence), self.assertRaises(ValueError):
+                iniciar_intencion.construir_comando_demo(
+                    "helmet.mp4", conf=confidence,
+                )
+
+    def test_iniciador_envia_parametros_personas_en_proximidad(self):
+        with patch("iniciar_intencion.subprocess.run") as executor:
+            executor.return_value.returncode = 0
+            output = iniciar_intencion.main([
+                "--demo-proximidad", "--fuente", "helmet.mp4",
+                "--imgsz", "640", "--conf", "0.20", "--sin-mostrar",
+            ])
+        self.assertEqual(output, 0)
+        cmd = executor.call_args.args[0]
+        self.assertEqual(cmd[cmd.index("--imgsz") + 1], "640")
+        self.assertEqual(cmd[cmd.index("--conf") + 1], "0.2")
+
     def test_validaciones_argumentos(self):
         with self.assertRaises(ValueError):
             iniciar_cascos.construir_comando("", stride=3)

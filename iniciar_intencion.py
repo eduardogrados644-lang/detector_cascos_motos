@@ -5,6 +5,7 @@ Por ahora sólo permite ejecutar el prototipo experimental de postura YOLO Pose.
 No mezcla pesos ni salidas del módulo de cascos y NO infiere intenciones.
 """
 import argparse
+import math
 import subprocess
 import sys
 from pathlib import Path
@@ -34,12 +35,21 @@ def construir_comando_demo(
     filtro_brazos: bool = False,
     max_fotogramas: int = 0,
     modo: str = "posturas",
+    imgsz: int | None = None,
+    conf: float | None = None,
 ) -> list[str]:
     """Sólo lanza la demostración conductual, nunca el detector de cascos."""
     if not fuente.strip() or max_fotogramas < 0:
         raise ValueError("Fuente o número de fotogramas inválidos")
     if modo not in ("posturas", "proximidad", "brazos"):
         raise ValueError("Modo conductual inválido")
+    if imgsz is not None and (type(imgsz) is not int or imgsz < 64):
+        raise ValueError("imgsz debe ser entero mayor o igual a 64")
+    if conf is not None and (
+        not isinstance(conf, (int, float)) or
+        not math.isfinite(conf) or not 0 < conf <= 1
+    ):
+        raise ValueError("conf debe estar entre 0 (exclusivo) y 1")
     cmd = [
         sys.executable, "-m", "modules.behavioral.pose_detector",
         "--fuente", validar_fuente(fuente),
@@ -58,6 +68,10 @@ def construir_comando_demo(
         cmd.append("--guardar-capturas")
     if max_fotogramas:
         cmd.extend(["--max-fotogramas", str(max_fotogramas)])
+    if imgsz is not None:
+        cmd.extend(["--imgsz", str(imgsz)])
+    if conf is not None:
+        cmd.extend(["--conf", str(conf)])
     return cmd
 
 
@@ -81,6 +95,10 @@ def main(argv: list[str] | None = None) -> int:
         "--wifi", help="URL IP Webcam de celular/tablet Android"
     )
     parser.add_argument("--max-fotogramas", type=int, default=0)
+    parser.add_argument("--imgsz", type=int, default=None,
+                        help="Tamaño de análisis para YOLO Pose (por defecto: 320)")
+    parser.add_argument("--conf", type=float, default=None,
+                        help="Confianza mínima de YOLO Pose (por defecto: 0.45)")
     parser.add_argument("--sin-mostrar", action="store_true")
     parser.add_argument("--guardar-video", action="store_true")
     parser.add_argument(
@@ -126,6 +144,8 @@ def main(argv: list[str] | None = None) -> int:
                 filtro_brazos=args.filtro_brazos,
                 max_fotogramas=args.max_fotogramas,
                 modo=modo,
+                imgsz=args.imgsz,
+                conf=args.conf,
             )
             print({"posturas": "\nIniciando sólo la prueba de posturas.",
                    "proximidad": "\nIniciando prueba de proximidad, NO violencia.",
