@@ -1,0 +1,132 @@
+# Plan de mejoras y ampliación
+
+## Primera entrega: estructura sin romper el detector actual
+
+- Corrección de rutas en dataset/data.yaml y dataset_externo/data.yaml.
+- Conservación de los seis scripts actuales y de todos los modelos y datasets anteriores.
+- Detector complementario de personas/motocicletas con pesos COCO.
+- Módulo conductual autónomo con pesos YOLO11 Pose, lectura de video/cámara, seguimiento y eventos candidatos por persistencia temporal.
+- Registro CSV sin imágenes personales por defecto, diagnóstico y pruebas unitarias.
+- Documentación de actualización local usando Visual Studio Code y Git LFS.
+
+## Estructura
+
+    detector_cascos_motos/
+      detectar.py
+      detectar_refinado.py
+      camara_zoom.py
+      entrenar.py
+      modules/
+        traffic/
+          vehicle_detector.py
+        behavioral/
+          pose_detector.py
+          events.py
+      scripts/
+        diagnostico.py
+      tests/
+        test_eventos_conductuales.py
+
+## Pendientes para el detector vial
+
+1. Probar los dos modelos en secuencias reservadas, medir FPS/CPU/RAM y falsos positivos.
+2. Asociar personas, cascos, motocicletas y posibles matrículas con tracking y geometría; no asumir que la clase With Helmet representa a la persona completa.
+3. Confirmar eventos a lo largo de varios fotogramas antes de guardar posibles infracciones.
+4. Generar evidencias y registros por vehículo con opciones de privacidad, consentimiento cuando corresponda y control de duplicados.
+
+## Pendientes para el análisis conductual
+
+1. Evaluar pose con grabaciones de prueba y distinguir postura horizontal de caídas reales.
+2. Integrar un **modelo independiente y entrenado** de armas y objetos con clases auditadas.
+3. Agregar reconocimiento temporal de acciones e interacciones a partir de video.
+4. Validar tasas de errores, condiciones de iluminación, oclusiones y recursos de CPU.
+5. Implementar alertas revisables por personas, nunca inferencias definitivas sobre intención.
+
+## Condición para llevar estas mejoras a main
+
+Pasar las pruebas unitarias, comprobar la descarga de Git LFS y ejecutar manualmente al menos una imagen/video y cámara para los dos módulos sobre el equipo destino. No se ha realizado aún esa comprobación real en la computadora del usuario.
+
+
+## Segunda entrega: seguimiento y asociación vial conservadora
+
+- Se añade modules/traffic/association.py, con hipótesis geométricas independientes de YOLO y pruebas unitarias sin hardware.
+- Se añade modules/traffic/road_monitor.py, que lee una única fuente de video, ejecuta COCO y casco sobre el mismo fotograma y usa ByteTrack para persona/moto.
+- Una persona no se asigna a dos motocicletas cuando la escena es ambigua y una etiqueta de casco no se reutiliza para personas diferentes.
+- Solo genera candidatos con track ID de moto y persona estables y 4 observaciones consecutivas sin casco, una vez por moto durante la ejecución. No son infracciones verificadas.
+- El CSV se guarda localmente; el video anotado es optativo. Se mantiene la independencia del módulo conductual.
+
+### Validaciones todavía necesarias
+
+1. Probar el módulo integrado en videos diferentes y revisar las cajas dibujadas.
+2. Medir falsos positivos de asociación; la cercanía espacial no implica conducción y las etiquetas del dataset pueden representar regiones distintas de una cabeza.
+3. Ajustar umbrales según evidencias y probar vehículos con varios ocupantes y peatones cercanos.
+4. Evaluar consumo de CPU y fluidez antes de añadirlo a main.
+
+
+## Cuarta entrega: trazabilidad por cabeza (experimental)
+
+- Seguimiento por separado de COCO persona/moto y cabezas con el modelo de cascos.
+- Permitir candidatos independientes por cabeza rastreada dentro de una misma moto.
+- Supresión de etiquetas duplicadas y contradictorias sobre una cabeza.
+- Reinicio de confirmación ante saltos importantes de caja; sin identificar personas.
+- El ID de cabeza es temporal y puede cambiar con oclusiones. No hay conteo
+  garantizado de pasajeros, reconocimiento de identidades ni infracciones.
+- No se toca la IA conductual.
+
+### Validación necesaria para completar control vial
+- Revisar el video anotado en un caso de varios ocupantes, verificar cuál cabeza
+  corresponde a cada caja, y documentar cambios de ID.
+- Probar p15/p16 tanto With Helmet como Without Helmet para detectar falsos
+  positivos; no usar estos videos para reentrenar antes de evaluar.
+- Medir velocidad y memoria real en Windows con los dos modelos y tracking.
+- Sólo después de validar, considerar fusionar el PR de desarrollo a main.
+
+
+## Puntos de entrada para cada apartado
+
+- iniciar_cascos.py: entrada propia del sistema vial. Usa por defecto
+  videos_revisados y yolo11n.pt; está preparado para video y cámaras.
+- iniciar_intencion.py: entrada separada para el futuro sistema de detección
+  de eventos violentos/armas; actualmente sólo informa el estado y ofrece
+  demostración experimental de posturas con yolo11n-pose.pt.
+- Nunca son dos proyectos o dos repositorios: sólo dos apartados.
+- No unir modelos o datos entre los apartados. Desarrollar el modelo
+  especializado conductual antes de ofrecer detección real de armas/violencia.
+
+
+## Fuentes de video compartidas (sin unir las dos IA)
+
+- modules/camera_sources.py: menú de video, USB externa seleccionada por
+  índice y celular/tablet Android con URL IP Webcam /video.
+- Ambos iniciadores evitan seleccionar camara:0 y nunca hacen fallback
+  automático a la webcam integrada.
+- Los detectores reutilizan la apertura robusta de camara_zoom.py para USB
+  Windows y fuentes HTTP MJPEG; conservan sus modelos y reglas independientes.
+- Es necesario validar índices USB reales y conectividad LAN en Windows.
+- En la demostración conductual no se activan modelos de violencia o armas.
+
+
+## Novena entrega: dos modos dentro del control vial (misma IA de cascos)
+
+- \`iniciar_cascos.py --modo vial\`: funciona como antes, integra COCO + cascos.
+- \`iniciar_cascos.py --modo cascos\`: usa únicamente el modelo de cascos, sin
+  exigir motos y sin generar infracciones (útil para videos recortados p15/p16).
+- El modo cascos escribe un JSON de apariciones por fotograma y video opcional,
+  no perfiles/identidades ni sanciones. El apartado conductual sigue separado.
+- Antes de fusionar en main: ejecutar ambos modos en Windows, revisar imágenes
+  contra etiquetas humanas y probar cámaras externas.
+
+
+## Décima entrega: verificación temporal de clases por cabeza
+
+- Nueva \`modules/traffic/temporal_consistency.py\`: historial acotado de
+  clases \`con_casco/sin_casco\` por zona aproximada relativa a la moto.
+- Si ambas clases se alternan dentro de la ventana, muestra y cuenta
+  \`incierto\`, preservando cajas/observaciones originales y dejando
+  constancia en \`inconsistencias_cascos.csv\`.
+- No une dos cabezas simultáneas ni motos diferentes; reidentificación por
+  geometría con restricciones más estrictas cuando cambia el track ID.
+- **No** resuelve falsas etiquetas consistentes ni una persona COCO que
+  engloba a dos ocupantes; hará falta etiquetado por cabeza/modelo mejorado.
+- No cambia pesos ni umbrales, ni el módulo conductual. Probar en Windows
+  antes de fusionar con \`main\`.
