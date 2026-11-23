@@ -30,3 +30,29 @@ Solicitar clips **etiquetados temporalmente** de: brazo quieto mientras se sosti
 **Cámaras admitidas:** USB de cámara externa; celular/tablet Android por Wi-Fi/IP Webcam; RTSP/MJPEG de cámara IP; archivo local. Ni webcam integrada automática ni teléfono por USB.
 
 **Estado:** unidad y flujo comprobables mediante tests; precisión en escenas reales pendiente de los videos de evaluación.
+
+
+## Resultado del ensayo con `helmet.mp4` (60 fotogramas)
+
+Comparación de **las ejecuciones mostradas por el usuario** (no del acumulado de CSV históricos):
+
+| Fotograma | Perfil original | Perfil con `--filtro-brazos` | Observación visual |
+| --- | --- | --- | --- |
+| 6 | ID 1, izquierdo, desplazamiento rápido aparente | Igual | Conducción; manos próximas al manubrio |
+| 25 | ID 2, derecho, desplazamiento rápido aparente | Igual | Motociclista de la moto roja |
+| 39 | ID 1, derecho, desplazamiento rápido aparente | Igual | Conducción; solapamiento entre conductor y acompañante |
+
+En **esta muestra**: 3 avisos originales y 3 con filtro, en los mismos fotogramas, IDs y lados. **Reducción observada: 0 avisos (0 %)**. No prueba si alguno de esos movimientos físicos fue rápido, ya que se revisaron fotogramas aislados, no la secuencia completa. Tampoco implica sensibilidad, precisión o especificidad del filtro en otros escenarios. En las capturas no se aprecia una agresión y la postura de conductor/acompañante puede producir ambigüedades.
+
+**Decisión:** conservar `--filtro-brazos` sólo como opción de investigación; **no activarlo por defecto, no endurecer umbrales para acertar en un único video y no afirmar que resuelve falsos positivos**. Priorizar evaluación con videos específicos de acciones positivas y negativas antes de modificar el clasificador, entrenar un nuevo modelo o añadir una etiqueta de «pelea».
+
+## Próxima validación solicitada
+
+Necesitamos videos cortos de evaluación, con sujeto completo y acciones visibles (sin usar material privado sin permiso):
+1. Brazo levantado y sostenido, con tiempo de inicio y fin.
+2. Saludo, movimiento rápido de brazo, **sin agresión**.
+3. Persona caminando/conversando con brazos quietos.
+4. Dos personas cerca o interactuando pacíficamente; idealmente una toma con oclusión.
+5. Si existe material de prueba con permiso, conducción normal con manos en manubrio, como caso negativo.
+
+Para cada clip, identificar **acción visible** y el intervalo temporal; no usar categorías de «intención» inferida. Reservar estos videos para evaluación y no reutilizarlos para entrenar. La próxima revisión decidirá si las reglas geométricas justifican seguirse usando o si requieren un método temporal aprendido.
