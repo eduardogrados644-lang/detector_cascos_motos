@@ -48,6 +48,11 @@ class PruebasSeguimientoVisual(unittest.TestCase):
         with self.assertRaises(ValueError):
             MemoriaCajas().procesar(1,[caja(1,(10,10,0,20))])
 
+    def test_nombre_de_archivo_del_rastreador_personalizado(self):
+        from pathlib import Path
+        self.assertEqual(Path("config/trackers/bytetrack_buffer60.yaml").stem,
+                         "bytetrack_buffer60")
+
     def test_configuracion_experimental_tiene_solo_buffer_ampliado(self):
         from pathlib import Path
         archivo=Path(__file__).resolve().parents[1]/"config"/"trackers"/"bytetrack_buffer60.yaml"

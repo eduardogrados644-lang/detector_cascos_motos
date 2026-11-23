@@ -111,7 +111,7 @@ def main(argv=None):
     if args.guardar_video:
         directorio=RAIZ/"resultados"/"conductual"
         directorio.mkdir(parents=True,exist_ok=True)
-        salida=directorio/("seguimiento_personas_"+args.rastreador.split(".")[0]+"_"+
+        salida=directorio/("seguimiento_personas_"+Path(args.rastreador).stem+"_"+
                           datetime.now(timezone.utc).strftime("%Y%m%d_%H%M%S_%f")+".mp4")
     try:
         while True:
