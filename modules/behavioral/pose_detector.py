@@ -88,6 +88,10 @@ def main() -> None:
     parser.add_argument("--mostrar", action="store_true")
     parser.add_argument("--guardar-video", action="store_true")
     parser.add_argument(
+        "--guardar-capturas", action="store_true",
+        help="Guardar sólo fotogramas con avisos (máximo 20 por sesión)",
+    )
+    parser.add_argument(
         "--csv",
         default=None,
         help="Registro de candidatos; no guarda imágenes por defecto",
@@ -123,6 +127,9 @@ def main() -> None:
     destino.parent.mkdir(parents=True, exist_ok=True)
     nuevo = not destino.exists() or destino.stat().st_size == 0
     escritor_video = None
+    max_capturas = 20  # Tope de privacidad/espacio por ejecución.
+    capturas_guardadas = 0
+    carpeta_capturas = None
     fotograma = 0
     try:
         if args.guardar_video:
@@ -202,7 +209,13 @@ def main() -> None:
                     else:
                         print(f"[REVISAR] Fotograma {fotograma} ID {alerta.track_id}: postura horizontal persistente (no caída confirmada)")
 
-                if args.mostrar or args.guardar_video:
+                # Las capturas sólo se producen si el usuario las solicita y
+                # realmente existen avisos. No guardamos todas las personas.
+                capturar = (
+                    args.guardar_capturas and bool(alertas)
+                    and capturas_guardadas < max_capturas
+                )
+                if args.mostrar or args.guardar_video or capturar:
                     vista = resultado.plot()
                     if alertas:
                         cv2.putText(
@@ -212,6 +225,35 @@ def main() -> None:
                             (12, 35), cv2.FONT_HERSHEY_SIMPLEX,
                             0.6, (0, 0, 255), 2,
                         )
+                    if capturar:
+                        if carpeta_capturas is None:
+                            carpeta_capturas = destino.parent / (
+                                f"capturas_{args.modo}_"
+                                + datetime.now(timezone.utc).strftime("%Y%m%d_%H%M%S_%f")
+                            )
+                            carpeta_capturas.mkdir(parents=True, exist_ok=False)
+                        # Metadatos visibles: sólo IDs temporales y observaciones.
+                        for i, evento in enumerate(alertas[:3]):
+                            if args.modo == "brazos":
+                                detalle = (
+                                    f"ID {evento.track_id} {evento.brazo} {evento.tipo}"
+                                )
+                            elif args.modo == "proximidad":
+                                detalle = (
+                                    f"IDs {evento.track_ids[0]}-{evento.track_ids[1]} "
+                                    "proximidad_persistente"
+                                )
+                            else:
+                                detalle = f"ID {evento.track_id} {evento.tipo}"
+                            cv2.putText(
+                                vista, detalle[:90], (12, 65 + i * 26),
+                                cv2.FONT_HERSHEY_SIMPLEX, 0.47, (0, 0, 255), 2,
+                            )
+                        nombre = carpeta_capturas / f"fotograma_{fotograma:06d}.jpg"
+                        if not cv2.imwrite(str(nombre), vista):
+                            raise OSError(f"No se pudo guardar la captura: {nombre}")
+                        capturas_guardadas += 1
+                        print(f"[CAPTURA PARA REVISIÓN] {nombre}")
                     if escritor_video is not None:
                         escritor_video.write(vista)
                     if args.mostrar:
@@ -232,6 +274,11 @@ def main() -> None:
             cv2.destroyAllWindows()
 
     print(f"Fin. Modo {args.modo}; {fotograma} fotogramas. Archivo de eventos: {destino}")
+    if args.guardar_capturas:
+        if carpeta_capturas is None:
+            print("No hubo eventos nuevos para guardar capturas.")
+        else:
+            print(f"Capturas para revisión: {capturas_guardadas} en {carpeta_capturas}")
 
 
 if __name__ == "__main__":

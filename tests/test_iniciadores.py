@@ -88,6 +88,33 @@ class PruebasIniciadores(unittest.TestCase):
         self.assertEqual(codigo, 0)
         self.assertIn("brazos", ejecutor.call_args.args[0])
 
+    def test_capturas_optativas_se_envian_al_detector_de_pose(self):
+        cmd = iniciar_intencion.construir_comando_demo(
+            "helmet.mp4", modo="brazos", mostrar=False,
+            guardar_capturas=True, guardar_video=False,
+        )
+        self.assertIn("--guardar-capturas", cmd)
+        self.assertNotIn("--guardar-video", cmd)
+        self.assertNotIn("--mostrar", cmd)
+
+    def test_capturas_desactivadas_por_defecto(self):
+        cmd = iniciar_intencion.construir_comando_demo(
+            "helmet.mp4", modo="brazos", mostrar=False,
+        )
+        self.assertNotIn("--guardar-capturas", cmd)
+
+    def test_iniciador_acepta_capturas_con_usb_externa(self):
+        with patch("iniciar_intencion.subprocess.run") as ejecutor:
+            ejecutor.return_value.returncode = 0
+            salida = iniciar_intencion.main([
+                "--demo-brazos", "--usb", "1",
+                "--guardar-capturas", "--sin-mostrar",
+            ])
+        self.assertEqual(salida, 0)
+        cmd = ejecutor.call_args.args[0]
+        self.assertIn("--guardar-capturas", cmd)
+        self.assertIn("camara:1", cmd)
+
     def test_validaciones_argumentos(self):
         with self.assertRaises(ValueError):
             iniciar_cascos.construir_comando("", stride=3)

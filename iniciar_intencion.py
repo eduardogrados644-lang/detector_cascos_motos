@@ -30,6 +30,7 @@ def construir_comando_demo(
     fuente: str = "prueba_motos.mp4",
     mostrar: bool = True,
     guardar_video: bool = False,
+    guardar_capturas: bool = False,
     max_fotogramas: int = 0,
     modo: str = "posturas",
 ) -> list[str]:
@@ -48,6 +49,8 @@ def construir_comando_demo(
         cmd.append("--mostrar")
     if guardar_video:
         cmd.append("--guardar-video")
+    if guardar_capturas:
+        cmd.append("--guardar-capturas")
     if max_fotogramas:
         cmd.extend(["--max-fotogramas", str(max_fotogramas)])
     return cmd
@@ -75,6 +78,10 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--max-fotogramas", type=int, default=0)
     parser.add_argument("--sin-mostrar", action="store_true")
     parser.add_argument("--guardar-video", action="store_true")
+    parser.add_argument(
+        "--guardar-capturas", action="store_true",
+        help="Guardar capturas de avisos, opcional y sólo en resultados locales"
+    )
     parser.add_argument("--estado", action="store_true")
     args = parser.parse_args(argv)
     mostrar_estado()
@@ -106,6 +113,7 @@ def main(argv: list[str] | None = None) -> int:
                 fuente,
                 mostrar=not args.sin_mostrar,
                 guardar_video=args.guardar_video,
+                guardar_capturas=args.guardar_capturas,
                 max_fotogramas=args.max_fotogramas,
                 modo=modo,
             )
