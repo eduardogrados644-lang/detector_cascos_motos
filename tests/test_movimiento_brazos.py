@@ -45,8 +45,14 @@ class PruebasBrazos(unittest.TestCase):
         d = DetectorMovimientosBrazos(min_elevados=2)
         d.procesar(1, [persona()], 0)
         d.procesar(2, [persona(wy=90)], .1)
-        self.assertEqual(d.procesar(3, [persona()], .2), [])
-        self.assertEqual(len(d.procesar(4, [persona()], .3)), 1)
+        # El brazo vuelve a elevarse: no confirma aún elevación persistente,
+        # aunque sí puede producir un evento diferente de movimiento rápido.
+        eventos = d.procesar(3, [persona()], .2)
+        self.assertFalse(any(e.tipo == "brazo_elevado_persistente" for e in eventos))
+        eventos = d.procesar(4, [persona()], .3)
+        self.assertEqual(
+            [e.tipo for e in eventos].count("brazo_elevado_persistente"), 1
+        )
 
     def test_desplazamiento_rapido_repetido(self):
         d = DetectorMovimientosBrazos(min_elevados=20, min_movimientos=2)
