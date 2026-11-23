@@ -1,0 +1,5 @@
+archivo,origen_mp4,inicio_local_s,duracion_s,fps,resolucion,fotogramas,bytes,sha256,clases_segun_markup_oficial,marcos_globales_de_referencia,observaciones,rol
+fragmentos/01_aproximacion_42s_52s.mp4,1-11200.mp4,42,10.00,25/1,640x480,250,159695,1d2659fbaf44aad5aa1854b81ed48cb223d28a52afb8e27d15e5ddc1f3ea803a,Approach,1080-1251,acercamiento; coexistencia con grupos,evaluacion
+fragmentos/02_caminar_juntos_198s_212s.mp4,1-11200.mp4,198,14.00,25/1,640x480,350,313962,b3e8825b210a3bc55996b0d4ac136106258e6a9fe1c53ac652e5e1851a0bf19f,WalkTogether,4992-5260,caminar juntos; otras interacciones pueden solaparse,evaluacion
+fragmentos/03_acercamiento_encuentro_128s_136s.mp4,47300-58400.mp4,128,8.00,25/1,640x480,200,188952,442fc740ca0855888881f210f7b834ec4ad95cc8c5babad9e7aa4d56eecfe0b3,Approach|Meet|Split,50522-50660,aproximacion y encuentro; varias etiquetas superpuestas,evaluacion
+fragmentos/04_interaccion_fisica_simulada_136s_152s.mp4,47300-58400.mp4,136,16.00,25/1,640x480,400,340174,b3a307afe6ac596ea85a04a663016a23580a5d821e8d8d214a37d5a8c4e0881c,Fight,50727-51050,escena de pelea actuada; distintas personas y tramos,evaluacion
