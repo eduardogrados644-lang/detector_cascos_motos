@@ -31,6 +31,7 @@ def construir_comando_demo(
     mostrar: bool = True,
     guardar_video: bool = False,
     guardar_capturas: bool = False,
+    filtro_brazos: bool = False,
     max_fotogramas: int = 0,
     modo: str = "posturas",
 ) -> list[str]:
@@ -45,6 +46,10 @@ def construir_comando_demo(
     ]
     if modo in ("proximidad", "brazos"):
         cmd.extend(["--modo", modo])
+    if filtro_brazos:
+        if modo != "brazos":
+            raise ValueError("El filtro de brazos requiere modo brazos")
+        cmd.append("--filtro-brazos")
     if mostrar:
         cmd.append("--mostrar")
     if guardar_video:
@@ -78,6 +83,10 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--max-fotogramas", type=int, default=0)
     parser.add_argument("--sin-mostrar", action="store_true")
     parser.add_argument("--guardar-video", action="store_true")
+    parser.add_argument(
+        "--filtro-brazos", action="store_true",
+        help="Filtro experimental de saltos de muñeca, sólo en demo-brazos",
+    )
     parser.add_argument(
         "--guardar-capturas", action="store_true",
         help="Guardar capturas de avisos, opcional y sólo en resultados locales"
@@ -114,6 +123,7 @@ def main(argv: list[str] | None = None) -> int:
                 mostrar=not args.sin_mostrar,
                 guardar_video=args.guardar_video,
                 guardar_capturas=args.guardar_capturas,
+                filtro_brazos=args.filtro_brazos,
                 max_fotogramas=args.max_fotogramas,
                 modo=modo,
             )

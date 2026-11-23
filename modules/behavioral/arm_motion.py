@@ -25,6 +25,9 @@ class EventoBrazo:
 class ObservacionBrazo:
     posicion_relativa: tuple[float, float]
     elevado: bool
+    # El codo y la longitud del antebrazo ayudan a descartar saltos de puntos.
+    codo_relativo: tuple[float, float] = (0.0, 0.0)
+    largo_antebrazo: float = 0.0
 
 
 @dataclass(frozen=True)
@@ -57,7 +60,7 @@ def observar_brazos(
             for p in puntos
         ):
             continue
-        hombro, _, muneca, cadera = puntos
+        hombro, codo, muneca, cadera = puntos
         torso = hypot(cadera[0] - hombro[0], cadera[1] - hombro[1])
         if not 0.10 * alto <= torso <= 0.85 * alto:
             continue
@@ -65,8 +68,47 @@ def observar_brazos(
             (muneca[0] - hombro[0]) / torso,
             (muneca[1] - hombro[1]) / torso,
         )
-        resultado[lado] = ObservacionBrazo(pos, pos[1] < -0.20)
+        codo_pos = (
+            (codo[0] - hombro[0]) / torso,
+            (codo[1] - hombro[1]) / torso,
+        )
+        largo = hypot(pos[0] - codo_pos[0], pos[1] - codo_pos[1])
+        resultado[lado] = ObservacionBrazo(
+            pos, pos[1] < -0.20, codo_pos, largo,
+        )
     return resultado
+
+
+def desplazamiento_plausible(
+    anterior: ObservacionBrazo,
+    actual: ObservacionBrazo,
+    duracion_s: float,
+    velocidad_maxima: float = 12.0,
+    variacion_longitud_maxima: float = 1.6,
+) -> bool:
+    """Control optativo de saltos de keypoints; NO certifica movimientos.
+
+    Compara longitudes aparentes de antebrazo entre observaciones y evita
+    teletransportes de muñeca en pocos milisegundos. Puede descartar gestos
+    legítimos con oclusión/perspectiva, por lo que es un filtro experimental.
+    """
+    if (
+        not isfinite(duracion_s) or duracion_s <= 0
+        or not isfinite(velocidad_maxima) or velocidad_maxima <= 0
+        or not isfinite(variacion_longitud_maxima)
+        or variacion_longitud_maxima < 1
+    ):
+        return False
+    a, b = anterior.largo_antebrazo, actual.largo_antebrazo
+    if not all(isfinite(x) for x in (a, b)) or min(a, b) < 0.12:
+        return False
+    if max(a, b) / min(a, b) > variacion_longitud_maxima:
+        return False
+    distancia = hypot(
+        actual.posicion_relativa[0] - anterior.posicion_relativa[0],
+        actual.posicion_relativa[1] - anterior.posicion_relativa[1],
+    )
+    return distancia / duracion_s <= velocidad_maxima
 
 
 def _caja_continua(a: tuple[float, ...], b: tuple[float, ...]) -> bool:
@@ -93,12 +135,14 @@ class DetectorMovimientosBrazos:
         velocidad_minima: float = 1.5,
         separacion_alertas: int = 90,
         pausa_maxima_s: float = 5.0,
+        filtro_saltos: bool = False,
     ) -> None:
         if (
             min_elevados < 2 or min_movimientos < 1
             or not isfinite(velocidad_minima) or velocidad_minima <= 0
             or separacion_alertas < 1
             or not isfinite(pausa_maxima_s) or pausa_maxima_s <= 0
+            or not isinstance(filtro_saltos, bool)
         ):
             raise ValueError("Parámetros de movimiento inválidos")
         self.min_elevados = min_elevados
@@ -106,6 +150,7 @@ class DetectorMovimientosBrazos:
         self.velocidad_minima = velocidad_minima
         self.separacion_alertas = separacion_alertas
         self.pausa_maxima_s = pausa_maxima_s
+        self.filtro_saltos = filtro_saltos
         self._historial: dict[tuple[int, str], HistoriaBrazo] = {}
         self._ultima_alerta: dict[tuple[int, str, str], int] = {}
 
@@ -142,9 +187,16 @@ class DetectorMovimientosBrazos:
                     ) / (tiempo_s - previo.tiempo_s)
                     if consecutivo else 0.0
                 )
+                paso_valido = (
+                    consecutivo
+                    and (not self.filtro_saltos or desplazamiento_plausible(
+                        previo.observacion, observacion,
+                        tiempo_s - previo.tiempo_s,
+                    ))
+                )
                 movimientos = (
                     previo.cuenta_movimientos + 1
-                    if consecutivo and velocidad >= self.velocidad_minima
+                    if paso_valido and velocidad >= self.velocidad_minima
                     else 0
                 )
                 siguiente[clave] = HistoriaBrazo(

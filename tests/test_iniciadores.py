@@ -115,6 +115,19 @@ class PruebasIniciadores(unittest.TestCase):
         self.assertIn("--guardar-capturas", cmd)
         self.assertIn("camara:1", cmd)
 
+    def test_filtro_brazos_solo_se_envia_en_modo_brazos(self):
+        cmd = iniciar_intencion.construir_comando_demo(
+            "helmet.mp4", modo="brazos",
+            filtro_brazos=True, guardar_capturas=True, mostrar=False,
+        )
+        self.assertIn("--filtro-brazos", cmd)
+        self.assertIn("--guardar-capturas", cmd)
+        self.assertNotIn("modules.traffic", " ".join(cmd))
+        with self.assertRaises(ValueError):
+            iniciar_intencion.construir_comando_demo(
+                "helmet.mp4", modo="proximidad", filtro_brazos=True,
+            )
+
     def test_validaciones_argumentos(self):
         with self.assertRaises(ValueError):
             iniciar_cascos.construir_comando("", stride=3)

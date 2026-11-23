@@ -85,6 +85,10 @@ def main() -> None:
     parser.add_argument("--min-fotogramas", type=int, default=6)
     parser.add_argument("--separacion-alertas", type=int, default=90)
     parser.add_argument("--max-fotogramas", type=int, default=0)
+    parser.add_argument(
+        "--filtro-brazos", action="store_true",
+        help="Filtro optativo de saltos de muñeca en modo brazos",
+    )
     parser.add_argument("--mostrar", action="store_true")
     parser.add_argument("--guardar-video", action="store_true")
     parser.add_argument(
@@ -100,12 +104,15 @@ def main() -> None:
 
     if not (0 < args.conf <= 1) or args.imgsz < 64 or args.max_fotogramas < 0:
         parser.error("Parámetros de confianza, imagen o límite inválidos")
+    if args.filtro_brazos and args.modo != "brazos":
+        parser.error("--filtro-brazos sólo está disponible en modo brazos")
     detector = (
         DetectorProximidad(args.min_fotogramas, args.separacion_alertas)
         if args.modo == "proximidad"
         else DetectorMovimientosBrazos(
             min_elevados=max(2, args.min_fotogramas),
             separacion_alertas=args.separacion_alertas,
+            filtro_saltos=args.filtro_brazos,
         ) if args.modo == "brazos"
         else DetectorEventos(args.min_fotogramas, args.separacion_alertas)
     )
@@ -115,9 +122,13 @@ def main() -> None:
         raise ValueError("El modelo conductual debe ser de tipo pose, no detect")
     camara = abrir_captura(fuente)
 
-    nombre_csv = {"posturas": "eventos.csv",
-                  "proximidad": "eventos_proximidad.csv",
-                  "brazos": "eventos_brazos.csv"}[args.modo]
+    nombre_csv = (
+        "eventos_brazos_filtrados.csv"
+        if args.modo == "brazos" and args.filtro_brazos
+        else {"posturas": "eventos.csv",
+              "proximidad": "eventos_proximidad.csv",
+              "brazos": "eventos_brazos.csv"}[args.modo]
+    )
     destino = Path(args.csv if args.csv else RAIZ / "resultados" / "conductual" / nombre_csv).expanduser()
     fps_fuente = camara.get(cv2.CAP_PROP_FPS)
     if not isfinite(fps_fuente) or fps_fuente <= 0:
@@ -141,7 +152,8 @@ def main() -> None:
             salida = destino.parent / (
                 {"posturas": "resultado_posturas_",
                  "proximidad": "resultado_proximidad_",
-                 "brazos": "resultado_brazos_"}[args.modo]
+                 "brazos": ("resultado_brazos_filtrados_" if args.filtro_brazos
+                            else "resultado_brazos_")}[args.modo]
                 + datetime.now(timezone.utc).strftime("%Y%m%d_%H%M%S_%f")
                 + ".mp4"
             )
@@ -228,7 +240,7 @@ def main() -> None:
                     if capturar:
                         if carpeta_capturas is None:
                             carpeta_capturas = destino.parent / (
-                                f"capturas_{args.modo}_"
+                                f"capturas_{args.modo}{'_filtradas' if args.filtro_brazos else ''}_"
                                 + datetime.now(timezone.utc).strftime("%Y%m%d_%H%M%S_%f")
                             )
                             carpeta_capturas.mkdir(parents=True, exist_ok=False)

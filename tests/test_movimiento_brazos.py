@@ -3,6 +3,7 @@ import unittest
 from modules.behavioral.events import Persona
 from modules.behavioral.arm_motion import (
     DetectorMovimientosBrazos, observar_brazos,
+    desplazamiento_plausible,
 )
 
 
@@ -98,6 +99,41 @@ class PruebasBrazos(unittest.TestCase):
         for i in range(3,7):
             self.assertEqual(d.procesar(i, [persona()], i/10), [])
         self.assertEqual(len(d.procesar(7, [persona()], .7)), 1)
+
+    def test_filtro_descarta_saltos_incoherentes_de_muneca(self):
+        d = DetectorMovimientosBrazos(
+            min_elevados=20, min_movimientos=2, filtro_saltos=True,
+        )
+        # La longitud aparente de antebrazo cambia brutalmente.
+        d.procesar(1, [persona(wx=55, wy=20)], 0.0)
+        self.assertEqual(d.procesar(2, [persona(wx=55, wy=115)], 0.1), [])
+        self.assertEqual(d.procesar(3, [persona(wx=55, wy=20)], 0.2), [])
+
+    def test_filtro_preserva_movimiento_geometricamente_plausible(self):
+        d = DetectorMovimientosBrazos(
+            min_elevados=20, min_movimientos=2, filtro_saltos=True,
+        )
+        d.procesar(1, [persona(wx=35, wy=80)], 0.0)
+        self.assertEqual(d.procesar(2, [persona(wx=90, wy=80)], 0.1), [])
+        eventos = d.procesar(3, [persona(wx=35, wy=80)], 0.2)
+        self.assertEqual(
+            [e.tipo for e in eventos],
+            ["desplazamiento_rapido_aparente_de_brazo"],
+        )
+
+    def test_filtro_excluye_velocidades_aparentes_extremas(self):
+        primero = observar_brazos(persona(wx=35, wy=80))["izquierdo"]
+        segundo = observar_brazos(persona(wx=90, wy=80))["izquierdo"]
+        self.assertTrue(desplazamiento_plausible(primero, segundo, 0.1))
+        self.assertFalse(desplazamiento_plausible(primero, segundo, 0.01))
+
+    def test_filtro_optativo_conserva_el_perfil_anterior(self):
+        anterior = DetectorMovimientosBrazos(min_elevados=20, min_movimientos=2)
+        anterior.procesar(1, [persona(wx=55, wy=20)], 0)
+        anterior.procesar(2, [persona(wx=55, wy=115)], 0.1)
+        eventos = anterior.procesar(3, [persona(wx=55, wy=20)], 0.2)
+        self.assertEqual([e.tipo for e in eventos],
+                         ["desplazamiento_rapido_aparente_de_brazo"])
 
     def test_parametros_invalidos(self):
         with self.assertRaises(ValueError):
