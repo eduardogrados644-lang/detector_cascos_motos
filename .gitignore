@@ -58,3 +58,7 @@ datos_intenciones/**/*.jpg
 datos_intenciones/**/*.jpeg
 datos_intenciones/**/*.png
 datos_intenciones/**/*.zip
+
+# Pesos externos de armas y modelos especializados; no subir a repo público
+modelos_intenciones/**/*.pt
+modelos_intenciones/**/*.safetensors
