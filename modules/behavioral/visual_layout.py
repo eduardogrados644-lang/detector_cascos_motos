@@ -33,6 +33,10 @@ def texto_evento_resumido(evento, modo: str) -> str:
     if modo == "proximidad":
         a, b = evento.track_ids
         return f"IDs {a}-{b}: proximidad observada (revisar)"
+    if modo == "agresiones":
+        tipo = ("POSIBLE AGRESION" if evento.tipo == "posible_agresion"
+                else "POSIBLE INTENTO DE AGRESION")
+        return f"IDs {evento.track_id}-{evento.objetivo_id}: {tipo} (REVISAR)"
     if modo == "posturas":
         return f"ID {evento.track_id}: postura horizontal (revisar)"
     raise ValueError("Modo desconocido")

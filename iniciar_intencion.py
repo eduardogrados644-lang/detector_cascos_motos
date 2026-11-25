@@ -22,6 +22,7 @@ def mostrar_estado() -> None:
     print("Disponible: prueba de posturas horizontales con YOLO Pose.")
     print("Disponible: proximidad persistente entre personas; NO es pelea.")
     print("Disponible: brazos elevados y desplazamientos aparentes (experimental).")
+    print("Disponible: gestos dirigidos entre personas (posibles agresiones, no confirmadas).")
     print("Disponible: candidatos de armas con pesos especializados (gun/knife).")
     print("Disponible: clasificacion temporal VideoMAE solo sobre archivos de video.")
     print("Pendiente: validacion real, precision, y deteccion de acciones concretas.")
@@ -39,11 +40,12 @@ def construir_comando_demo(
     modo: str = "posturas",
     imgsz: int | None = None,
     conf: float | None = None,
+    guardar_clips: bool = False,
 ) -> list[str]:
     """Sólo lanza la demostración conductual, nunca el detector de cascos."""
     if not fuente.strip() or max_fotogramas < 0:
         raise ValueError("Fuente o número de fotogramas inválidos")
-    if modo not in ("posturas", "proximidad", "brazos"):
+    if modo not in ("posturas", "proximidad", "brazos", "agresiones"):
         raise ValueError("Modo conductual inválido")
     if imgsz is not None and (type(imgsz) is not int or imgsz < 64):
         raise ValueError("imgsz debe ser entero mayor o igual a 64")
@@ -56,7 +58,7 @@ def construir_comando_demo(
         sys.executable, "-m", "modules.behavioral.pose_detector",
         "--fuente", validar_fuente(fuente),
     ]
-    if modo in ("proximidad", "brazos"):
+    if modo in ("proximidad", "brazos", "agresiones"):
         cmd.extend(["--modo", modo])
     if filtro_brazos:
         if modo != "brazos":
@@ -68,6 +70,10 @@ def construir_comando_demo(
         cmd.append("--guardar-video")
     if guardar_capturas:
         cmd.append("--guardar-capturas")
+    if guardar_clips:
+        if modo != "agresiones":
+            raise ValueError("Los clips de eventos requieren --demo-agresiones")
+        cmd.append("--guardar-clips")
     if max_fotogramas:
         cmd.extend(["--max-fotogramas", str(max_fotogramas)])
     if imgsz is not None:
@@ -135,6 +141,7 @@ def main(argv: list[str] | None = None) -> int:
     )
     demos.add_argument("--demo-proximidad", action="store_true", help="Cercanía persistente, no violencia")
     demos.add_argument("--demo-brazos", action="store_true", help="Movimientos aparentes de brazos, no agresión")
+    demos.add_argument("--demo-agresiones", action="store_true", help="Gestos dirigidos a otra persona (posible agresion, NO confirmada)")
     demos.add_argument("--demo-armas", action="store_true", help="Posibles pistolas/cuchillos con modelo especializado")
     demos.add_argument("--demo-violencia", action="store_true", help="Clasificacion temporal de video local, no agresion confirmada")
     fuentes = parser.add_mutually_exclusive_group()
@@ -152,6 +159,8 @@ def main(argv: list[str] | None = None) -> int:
                         help="Confianza mínima de YOLO Pose (por defecto: 0.45)")
     parser.add_argument("--sin-mostrar", action="store_true")
     parser.add_argument("--guardar-video", action="store_true")
+    parser.add_argument("--guardar-clips", action="store_true",
+                        help="Clips cortos por aviso (solo modo agresiones)")
     parser.add_argument(
         "--filtro-brazos", action="store_true",
         help="Filtro experimental de saltos de muñeca, sólo en demo-brazos",
@@ -171,31 +180,34 @@ def main(argv: list[str] | None = None) -> int:
         return 0
     try:
         demo = (args.demo_posturas or args.demo_proximidad or args.demo_brazos
-                or args.demo_armas or args.demo_violencia)
+                or args.demo_agresiones or args.demo_armas or args.demo_violencia)
         modo = ("violencia" if args.demo_violencia else "armas" if args.demo_armas else
+                "agresiones" if args.demo_agresiones else
                 "brazos" if args.demo_brazos else
                 "proximidad" if args.demo_proximidad else "posturas")
         if not demo:
-            print("\n1. Probar el prototipo de posturas (experimental)")
-            print("2. Observar proximidad persistente (no significa pelea)")
-            print("3. Observar brazos elevados y movimientos aparentes")
-            print("4. Buscar posibles armas (requiere modelo de armas)")
-            print("5. Clasificar posibles escenas violentas (requiere video local)")
+            print("\n1. Posible agresion / intento entre personas (experimental)")
+            print("2. Observar posturas corporales")
+            print("3. Observar proximidad persistente (no significa pelea)")
+            print("4. Observar brazos elevados y movimientos aparentes")
+            print("5. Buscar posibles armas (requiere modelo de armas)")
+            print("6. Clasificar videos con VideoMAE (solo archivos)")
             print("0. Salir sin iniciar análisis")
             opcion = input("Opción: ").strip()
             if opcion == "0":
                 return 0
-            if opcion not in ("1", "2", "3", "4", "5"):
+            if opcion not in ("1", "2", "3", "4", "5", "6"):
                 raise ValueError("Opción no válida")
-            modo = ("violencia" if opcion == "5" else "armas" if opcion == "4" else
-                    "brazos" if opcion == "3" else
-                    "proximidad" if opcion == "2" else "posturas")
+            modo = ("violencia" if opcion == "6" else "armas" if opcion == "5" else
+                    "brazos" if opcion == "4" else
+                    "proximidad" if opcion == "3" else
+                    "posturas" if opcion == "2" else "agresiones")
             demo = True
         if demo:
             if modo == "violencia":
                 if args.usb is not None or args.wifi or not args.fuente:
                     raise ValueError("VideoMAE usa solo --fuente archivo.mp4, no camaras")
-                if args.guardar_video or args.guardar_capturas or args.filtro_brazos:
+                if args.guardar_video or args.guardar_capturas or args.filtro_brazos or args.guardar_clips:
                     raise ValueError("VideoMAE solo guarda CSV; no admite video/capturas/filtro brazos")
                 cmd = construir_comando_acciones(
                     args.fuente, device=args.device,
@@ -203,7 +215,7 @@ def main(argv: list[str] | None = None) -> int:
                 print("Analizando video temporal experimental, NO agresion confirmada:", args.fuente)
                 return subprocess.run(cmd, cwd=RAIZ, check=False).returncode
             if modo == "armas":
-                if args.guardar_capturas or args.filtro_brazos:
+                if args.guardar_capturas or args.filtro_brazos or args.guardar_clips:
                     raise ValueError("Modo armas no permite capturas ni filtro de brazos")
                 fuente = seleccionar_fuente(args.fuente, args.usb, args.wifi)
                 if fuente is None:
@@ -223,6 +235,7 @@ def main(argv: list[str] | None = None) -> int:
                 mostrar=not args.sin_mostrar,
                 guardar_video=args.guardar_video,
                 guardar_capturas=args.guardar_capturas,
+                guardar_clips=args.guardar_clips,
                 filtro_brazos=args.filtro_brazos,
                 max_fotogramas=args.max_fotogramas,
                 modo=modo,
@@ -231,7 +244,8 @@ def main(argv: list[str] | None = None) -> int:
             )
             print({"posturas": "\nIniciando sólo la prueba de posturas.",
                    "proximidad": "\nIniciando prueba de proximidad, NO violencia.",
-                   "brazos": "\nIniciando prueba de movimientos de brazos, NO agresión."}[modo])
+                   "brazos": "\nIniciando prueba de movimientos de brazos, NO agresión.",
+                   "agresiones": "\nIniciando observacion de gestos dirigidos (NO agresion confirmada)."}[modo])
             print("Fuente seleccionada:", fuente)
             if fuente.startswith("camara:"):
                 print("AVISO: verifica que el índice corresponda a la USB externa.")

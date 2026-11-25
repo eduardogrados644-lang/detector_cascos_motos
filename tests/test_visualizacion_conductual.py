@@ -44,6 +44,13 @@ class PruebasVisualizacionConductual(unittest.TestCase):
         )
         with self.assertRaises(ValueError):
             texto_evento_resumido(None, "golpes")
+    def test_agresion_etiqueta_candidato_sin_confirmar(self):
+        evento = SimpleNamespace(track_id=1, objetivo_id=2, tipo="posible_agresion")
+        txt = texto_evento_resumido(evento, "agresiones")
+        self.assertIn("POSIBLE AGRESION", txt)
+        self.assertIn("REVISAR", txt)
+        evento = SimpleNamespace(track_id=1, objetivo_id=2, tipo="posible_intento_agresion")
+        self.assertIn("POSIBLE INTENTO DE AGRESION", texto_evento_resumido(evento, "agresiones"))
 
 
 if __name__ == "__main__":

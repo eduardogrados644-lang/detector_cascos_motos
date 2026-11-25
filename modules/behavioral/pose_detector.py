@@ -14,7 +14,9 @@ import cv2
 from ultralytics import YOLO
 
 from .events import DetectorEventos, Persona
-from .proximity import DetectorProximidad
+from .proximity import DetectorProximidad, estan_cerca
+from .aggression import DetectorGestosDirigidos
+from .event_clips import GrabadorClips
 from .arm_motion import DetectorMovimientosBrazos
 from .visual_layout import dimensiones_anotadas, texto_evento_resumido
 from modules.camera_sources import abrir_captura
@@ -24,7 +26,7 @@ from modules.camera_recovery import recuperar_flujo, limpiar_rastreadores
 RAIZ = Path(__file__).resolve().parents[2]
 
 
-def renderizar_vista(resultado, personas: list[Persona], alertas: list, modo: str):
+def renderizar_vista(resultado, personas: list[Persona], alertas: list, modo: str, avisos_activos=None):
     """Muestra el esqueleto sin taparlo con rótulos gigantes.
 
     El modelo recibe siempre el fotograma ORIGINAL. Sólo se amplía la vista
@@ -53,6 +55,32 @@ def renderizar_vista(resultado, personas: list[Persona], alertas: list, modo: st
             cv2.FONT_HERSHEY_SIMPLEX, 0.45, (255, 255, 255), 2,
         )
 
+    # Destacar sólo observaciones de movimientos dirigidos; no culpar a nadie.
+    if modo == "agresiones" and avisos_activos:
+        por_id = {p.track_id: p for p in personas if p.track_id is not None}
+        for actor_id, (tipo, objetivo_id, _ultimo) in avisos_activos.items():
+            actor, objetivo = por_id.get(actor_id), por_id.get(objetivo_id)
+            if actor is None or objetivo is None or not estan_cerca(actor, objetivo):
+                continue
+            color = ((50, 50, 235) if tipo == "posible_agresion"
+                     else (0, 160, 255))
+            x1, y1, x2, y2 = actor.caja
+            p1 = (max(0, int(x1 * escala_x)), max(0, int(y1 * escala_y)))
+            p2 = (min(ancho - 1, int(x2 * escala_x)),
+                  min(alto - 1, int(y2 * escala_y)))
+            cv2.rectangle(vista, p1, p2, color, 3)
+            etiqueta = ("POSIBLE AGRESION" if tipo == "posible_agresion"
+                        else "POSIBLE INTENTO DE AGRESION")
+            etiqueta = f"ID {actor_id} | {etiqueta} (REVISAR)"
+            tam, _base = cv2.getTextSize(
+                etiqueta, cv2.FONT_HERSHEY_SIMPLEX, 0.43, 1)
+            tx = max(3, min(ancho - tam[0] - 6, p1[0]))
+            ty = max(tam[1] + 7, p1[1] - 5)
+            cv2.rectangle(vista, (tx - 3, ty - tam[1] - 5),
+                          (tx + tam[0] + 3, ty + 4), color, -1)
+            cv2.putText(vista, etiqueta, (tx, ty), cv2.FONT_HERSHEY_SIMPLEX,
+                        0.43, (255, 255, 255), 1, cv2.LINE_AA)
+
     # Un panel fijo fuera del cuerpo evita tapar brazos y muñecas.
     vista = cv2.copyMakeBorder(
         vista, 0, panel, 0, 0, cv2.BORDER_CONSTANT, value=(25, 25, 25),
@@ -61,6 +89,7 @@ def renderizar_vista(resultado, personas: list[Persona], alertas: list, modo: st
         "posturas": "POSTURA: observaciones para revision",
         "proximidad": "PROXIMIDAD: no indica pelea",
         "brazos": "BRAZOS: no indica agresion",
+        "agresiones": "GESTOS DIRIGIDOS: revisar, no confirma agresion",
     }[modo]
     cv2.putText(
         vista, titulo, (10, alto + 20),
@@ -137,7 +166,7 @@ def main() -> None:
     )
     parser.add_argument("--fuente", default="prueba_motos.mp4", help="video, camara:1 (USB externa), IP Webcam o RTSP")
     parser.add_argument("--modelo", default="yolo11n-pose.pt")
-    parser.add_argument("--modo", choices=("posturas", "proximidad", "brazos"), default="posturas")
+    parser.add_argument("--modo", choices=("posturas", "proximidad", "brazos", "agresiones"), default="posturas")
     parser.add_argument("--conf", type=float, default=0.45)
     parser.add_argument("--imgsz", type=int, default=320)
     parser.add_argument("--min-fotogramas", type=int, default=6)
@@ -150,6 +179,8 @@ def main() -> None:
     )
     parser.add_argument("--mostrar", action="store_true")
     parser.add_argument("--guardar-video", action="store_true")
+    parser.add_argument("--guardar-clips", action="store_true",
+                        help="Clips de ~2 s antes y 3 s despues de avisos, solo agresiones")
     parser.add_argument(
         "--guardar-capturas", action="store_true",
         help="Guardar sólo fotogramas con avisos (máximo 20 por sesión)",
@@ -165,9 +196,15 @@ def main() -> None:
         parser.error("Parámetros de confianza, imagen o límite inválidos")
     if args.filtro_brazos and args.modo != "brazos":
         parser.error("--filtro-brazos sólo está disponible en modo brazos")
+    if args.guardar_clips and args.modo != "agresiones":
+        parser.error("--guardar-clips solo existe en modo agresiones")
     def nuevo_detector():
         return (
-            DetectorProximidad(args.min_fotogramas, args.separacion_alertas)
+            DetectorGestosDirigidos(
+                min_cercania=max(2, args.min_fotogramas // 2),
+                separacion_alertas=args.separacion_alertas,
+            ) if args.modo == "agresiones"
+            else DetectorProximidad(args.min_fotogramas, args.separacion_alertas)
             if args.modo == "proximidad"
             else DetectorMovimientosBrazos(
                 min_elevados=max(2, args.min_fotogramas),
@@ -189,7 +226,8 @@ def main() -> None:
         if args.modo == "brazos" and args.filtro_brazos
         else {"posturas": "eventos.csv",
               "proximidad": "eventos_proximidad.csv",
-              "brazos": "eventos_brazos.csv"}[args.modo]
+              "brazos": "eventos_brazos.csv",
+              "agresiones": "eventos_agresiones.csv"}[args.modo]
     )
     destino = Path(args.csv if args.csv else RAIZ / "resultados" / "conductual" / nombre_csv).expanduser()
     fps_fuente = camara.get(cv2.CAP_PROP_FPS)
@@ -203,6 +241,8 @@ def main() -> None:
     max_capturas = 20  # Tope de privacidad/espacio por ejecución.
     capturas_guardadas = 0
     carpeta_capturas = None
+    avisos_activos = {}  # actor -> (tipo, objetivo, último fotograma)
+    grabador_clips = GrabadorClips(destino.parent) if args.guardar_clips else None
     fotograma = 0
     try:
         if args.guardar_video:
@@ -215,7 +255,8 @@ def main() -> None:
                 {"posturas": "resultado_posturas_",
                  "proximidad": "resultado_proximidad_",
                  "brazos": ("resultado_brazos_filtrados_" if args.filtro_brazos
-                            else "resultado_brazos_")}[args.modo]
+                            else "resultado_brazos_"),
+                 "agresiones": "resultado_agresiones_"}[args.modo]
                 + datetime.now(timezone.utc).strftime("%Y%m%d_%H%M%S_%f")
                 + ".mp4"
             )
@@ -235,7 +276,7 @@ def main() -> None:
             csv_writer = csv.writer(archivo)
             if nuevo:
                 csv_writer.writerow(
-                    ["timestamp_utc", "fuente", "fotograma", "track_ids" if args.modo == "proximidad" else "track_id", "tipo", "estado"]
+                    ["timestamp_utc", "fuente", "fotograma", "track_ids" if args.modo in ("proximidad", "agresiones") else "track_id", "tipo", "estado"]
                 )
 
             while True:
@@ -253,6 +294,10 @@ def main() -> None:
                     # Un corte de señal invalida las rachas y los IDs anteriores.
                     limpiar_rastreadores(modelo)
                     detector = nuevo_detector()
+                    avisos_activos.clear()
+                    if grabador_clips is not None:
+                        grabador_clips.cerrar()
+                        grabador_clips = GrabadorClips(destino.parent)
                     print("[CAMARA] Analisis conductual reanudado.")
                 fotograma += 1
                 resultado = modelo.track(
@@ -265,7 +310,7 @@ def main() -> None:
                     verbose=False,
                 )[0]
                 personas = extraer_personas(resultado)
-                if args.modo == "brazos":
+                if args.modo in ("brazos", "agresiones"):
                     # Usar reloj de video para archivos y monotónico para cámaras.
                     if es_archivo_local:
                         pos_ms = camara.get(cv2.CAP_PROP_POS_MSEC)
@@ -283,14 +328,16 @@ def main() -> None:
                             instante,
                             args.fuente,
                             alerta.fotograma,
-                            f"{alerta.track_ids[0]}|{alerta.track_ids[1]}" if args.modo == "proximidad" else alerta.track_id,
-                            (f"{alerta.tipo}:{alerta.brazo}" if args.modo == "brazos"
+                            f"{alerta.track_ids[0]}|{alerta.track_ids[1]}" if args.modo in ("proximidad", "agresiones") else alerta.track_id,
+                            (f"{alerta.tipo}:{alerta.brazo}" if args.modo in ("brazos", "agresiones")
                              else alerta.tipo),
                             "candidato_para_revision",
                         ]
                     )
                     archivo.flush()
-                    if args.modo == "proximidad":
+                    if args.modo == "agresiones":
+                        print(f"[REVISAR INTERACCION] Fotograma {fotograma}; IDs {alerta.track_id}-{alerta.objetivo_id}: {alerta.tipo}, movimiento de {alerta.brazo} (NO confirmado)")
+                    elif args.modo == "proximidad":
                         print(f"[REVISAR PROXIMIDAD] Fotograma {fotograma}; IDs {alerta.track_ids}: cercanía persistente, NO pelea confirmada")
                     elif args.modo == "brazos":
                         print(f"[REVISAR BRAZO] Fotograma {fotograma}; ID {alerta.track_id}, "
@@ -298,14 +345,28 @@ def main() -> None:
                     else:
                         print(f"[REVISAR] Fotograma {fotograma} ID {alerta.track_id}: postura horizontal persistente (no caída confirmada)")
 
+                if args.modo == "agresiones":
+                    presentes = {p.track_id: p for p in personas if p.track_id is not None}
+                    for ident, (tipo, otro, ultimo) in list(avisos_activos.items()):
+                        if (fotograma - ultimo > 30
+                                or ident not in presentes or otro not in presentes
+                                or not estan_cerca(presentes[ident], presentes[otro])):
+                            del avisos_activos[ident]
+                    for evento in alertas:
+                        anterior = avisos_activos.get(evento.track_id)
+                        if (anterior is None or anterior[0] != "posible_agresion"
+                                or evento.tipo == "posible_agresion"):
+                            avisos_activos[evento.track_id] = (
+                                evento.tipo, evento.objetivo_id, fotograma)
+
                 # Las capturas sólo se producen si el usuario las solicita y
                 # realmente existen avisos. No guardamos todas las personas.
                 capturar = (
                     args.guardar_capturas and bool(alertas)
                     and capturas_guardadas < max_capturas
                 )
-                if args.mostrar or args.guardar_video or capturar:
-                    vista = renderizar_vista(resultado, personas, alertas, args.modo)
+                if args.mostrar or args.guardar_video or capturar or grabador_clips is not None:
+                    vista = renderizar_vista(resultado, personas, alertas, args.modo, avisos_activos)
                     if capturar:
                         if carpeta_capturas is None:
                             carpeta_capturas = destino.parent / (
@@ -320,6 +381,8 @@ def main() -> None:
                         print(f"[CAPTURA PARA REVISIÓN] {nombre}")
                     if escritor_video is not None:
                         escritor_video.write(vista)
+                    if grabador_clips is not None:
+                        grabador_clips.procesar(vista, tiempo_s, evento=bool(alertas))
                     if args.mostrar:
                         cv2.imshow("Analisis conductual experimental", vista)
                         if cv2.waitKey(1) & 0xFF in (27, ord("q")):
@@ -334,10 +397,14 @@ def main() -> None:
         camara.release()
         if escritor_video is not None:
             escritor_video.release()
+        if grabador_clips is not None:
+            grabador_clips.cerrar()
         if args.mostrar:
             cv2.destroyAllWindows()
 
     print(f"Fin. Modo {args.modo}; {fotograma} fotogramas. Archivo de eventos: {destino}")
+    if grabador_clips is not None:
+        print(f"Clips para revision: {grabador_clips.cantidad}, en {destino.parent}")
     if args.guardar_capturas:
         if carpeta_capturas is None:
             print("No hubo eventos nuevos para guardar capturas.")

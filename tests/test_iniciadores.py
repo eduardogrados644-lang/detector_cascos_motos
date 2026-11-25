@@ -208,6 +208,34 @@ class PruebasIniciadores(unittest.TestCase):
             ])
         self.assertEqual(codigo, 0)
         self.assertIn("modules.behavioral.weapon_detector", ejecutar.call_args.args[0])
+    def test_gestos_dirigidos_en_primer_apartado(self):
+        cmd = iniciar_intencion.construir_comando_demo(
+            "camara:1", modo="agresiones", guardar_clips=True,
+            guardar_video=True, guardar_capturas=True, mostrar=False)
+        self.assertIn("modules.behavioral.pose_detector", cmd)
+        self.assertEqual(cmd[cmd.index("--modo")+1], "agresiones")
+        self.assertIn("--guardar-clips", cmd)
+        self.assertIn("--guardar-video", cmd)
+        self.assertIn("--guardar-capturas", cmd)
+        self.assertNotIn("modules.traffic", " ".join(cmd))
+        self.assertNotIn("modules.behavioral.weapon_detector", " ".join(cmd))
+
+    def test_gestos_agresiones_lanzador_usb_sin_limite(self):
+        with patch("iniciar_intencion.subprocess.run") as ejecutar:
+            ejecutar.return_value.returncode = 0
+            salida=iniciar_intencion.main([
+                "--demo-agresiones", "--usb", "1",
+                "--guardar-clips", "--sin-mostrar"])
+        self.assertEqual(salida, 0)
+        cmd=ejecutar.call_args.args[0]
+        self.assertIn("camara:1", cmd)
+        self.assertIn("--guardar-clips", cmd)
+        self.assertNotIn("--max-fotogramas", cmd)
+
+    def test_clips_solo_agresiones(self):
+        with self.assertRaises(ValueError):
+            iniciar_intencion.construir_comando_demo(
+                "prueba.mp4", modo="brazos", guardar_clips=True)
 
 
 if __name__ == "__main__":
