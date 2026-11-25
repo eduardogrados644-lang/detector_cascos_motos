@@ -11,6 +11,7 @@ from pathlib import Path
 
 from .weapon_events import ConfirmadorArmas, nombres_armas
 from .person_tracker import fuente_video
+from modules.camera_recovery import recuperar_flujo
 
 RAIZ = Path(__file__).resolve().parents[2]
 TRADUCIR = {"gun": "POSIBLE PISTOLA", "knife": "POSIBLE CUCHILLO"}
@@ -48,7 +49,8 @@ def main(argv=None):
         print("AVISO: estos pesos NO permiten detectar cuchillos.")
     if "gun" not in clases.values():
         print("AVISO: estos pesos NO permiten detectar pistolas.")
-    captura = abrir_captura(fuente_video(args.fuente))
+    fuente_captura = fuente_video(args.fuente)
+    captura = abrir_captura(fuente_captura)
     fps = captura.get(cv2.CAP_PROP_FPS)
     if not isfinite(fps) or fps <= 0:
         fps = 20.0
@@ -67,8 +69,18 @@ def main(argv=None):
             registro.writerow(("fotograma", "segundo_aprox", "clase", "tipo", "estado"))
             while True:
                 ok, imagen = captura.read()
-                if not ok:
-                    break
+                if not ok or imagen is None:
+                    captura_nueva, imagen = recuperar_flujo(
+                        captura, fuente_captura, abrir_captura,
+                        detener=(lambda: (cv2.waitKey(1) & 0xFF)
+                                 in (27, ord("q"))) if args.mostrar else None,
+                    )
+                    if captura_nueva is None:
+                        break
+                    captura = captura_nueva
+                    # Las confirmaciones anteriores no sobreviven al corte.
+                    confirmador = ConfirmadorArmas(consecutivos=args.min_fotogramas)
+                    print("[CAMARA] Detector de armas reanudado, historial reiniciado.")
                 n += 1
                 pred = modelo.predict(
                     imagen, imgsz=args.imgsz, conf=args.conf,

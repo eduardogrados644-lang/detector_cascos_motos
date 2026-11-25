@@ -18,6 +18,7 @@ from .proximity import DetectorProximidad
 from .arm_motion import DetectorMovimientosBrazos
 from .visual_layout import dimensiones_anotadas, texto_evento_resumido
 from modules.camera_sources import abrir_captura
+from modules.camera_recovery import recuperar_flujo, limpiar_rastreadores
 
 
 RAIZ = Path(__file__).resolve().parents[2]
@@ -141,7 +142,8 @@ def main() -> None:
     parser.add_argument("--imgsz", type=int, default=320)
     parser.add_argument("--min-fotogramas", type=int, default=6)
     parser.add_argument("--separacion-alertas", type=int, default=90)
-    parser.add_argument("--max-fotogramas", type=int, default=0)
+    parser.add_argument("--max-fotogramas", type=int, default=0,
+                        help="0 (por defecto) = sin limite; mayor a 0 = prueba corta")
     parser.add_argument(
         "--filtro-brazos", action="store_true",
         help="Filtro optativo de saltos de muñeca en modo brazos",
@@ -163,16 +165,19 @@ def main() -> None:
         parser.error("Parámetros de confianza, imagen o límite inválidos")
     if args.filtro_brazos and args.modo != "brazos":
         parser.error("--filtro-brazos sólo está disponible en modo brazos")
-    detector = (
-        DetectorProximidad(args.min_fotogramas, args.separacion_alertas)
-        if args.modo == "proximidad"
-        else DetectorMovimientosBrazos(
-            min_elevados=max(2, args.min_fotogramas),
-            separacion_alertas=args.separacion_alertas,
-            filtro_saltos=args.filtro_brazos,
-        ) if args.modo == "brazos"
-        else DetectorEventos(args.min_fotogramas, args.separacion_alertas)
-    )
+    def nuevo_detector():
+        return (
+            DetectorProximidad(args.min_fotogramas, args.separacion_alertas)
+            if args.modo == "proximidad"
+            else DetectorMovimientosBrazos(
+                min_elevados=max(2, args.min_fotogramas),
+                separacion_alertas=args.separacion_alertas,
+                filtro_saltos=args.filtro_brazos,
+            ) if args.modo == "brazos"
+            else DetectorEventos(args.min_fotogramas, args.separacion_alertas)
+        )
+
+    detector = nuevo_detector()
     fuente = resolver_fuente(args.fuente)
     modelo = YOLO(args.modelo)
     if getattr(modelo, "task", None) != "pose":
@@ -235,8 +240,20 @@ def main() -> None:
 
             while True:
                 correcto, imagen = camara.read()
-                if not correcto:
-                    break
+                if not correcto or imagen is None:
+                    # Un MP4 debe terminar al llegar al final; la camara USB/IP no.
+                    camara_nueva, imagen = recuperar_flujo(
+                        camara, fuente, abrir_captura,
+                        detener=(lambda: (cv2.waitKey(1) & 0xFF)
+                                 in (27, ord("q"))) if args.mostrar else None,
+                    )
+                    if camara_nueva is None:
+                        break
+                    camara = camara_nueva
+                    # Un corte de señal invalida las rachas y los IDs anteriores.
+                    limpiar_rastreadores(modelo)
+                    detector = nuevo_detector()
+                    print("[CAMARA] Analisis conductual reanudado.")
                 fotograma += 1
                 resultado = modelo.track(
                     imagen,
