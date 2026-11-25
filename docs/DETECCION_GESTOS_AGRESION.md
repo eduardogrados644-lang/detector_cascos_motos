@@ -24,7 +24,7 @@ Desde CMD en VS Code, tras actualizar la rama:
 
 ```bat
 git pull --ff-only origin mejoras-modulos-vial-conductual
-Iniciar_Intencion.bat --demo-agresiones --usb 1 --guardar-video --guardar-capturas --guardar-clips
+Iniciar_Intencion.bat --demo-agresiones --usb 1 --guardar-video --guardar-capturas --guardar-clips --alerta-sonora
 ```
 
 Cambia `--usb 1` si tu cámara tiene otro índice. Con un móvil Android
@@ -71,3 +71,9 @@ Las pruebas no sustituyen una evaluación con videos positivos/negativos
 etiquetados, ni verifican precisión en cámaras reales. Evaluar antes
 de usar en vigilancia o emitir alarmas automáticas. El apartado VIAL
 queda intacto y no se fusiona a `main` sin validación.
+
+## Sonido opcional
+
+Con `--alerta-sonora` en Windows se reproduce un aviso corto no bloqueante
+cuando se genera un nuevo candidato. No es alarma de emergencia ni se
+reproduce por cada fotograma; es sólo una señal para revisión.

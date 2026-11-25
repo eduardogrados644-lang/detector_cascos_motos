@@ -26,6 +26,18 @@ from modules.camera_recovery import recuperar_flujo, limpiar_rastreadores
 RAIZ = Path(__file__).resolve().parents[2]
 
 
+def aviso_sonoro():
+    """Sonido breve y no bloqueante, solamente si se solicita en Windows."""
+    try:
+        import winsound
+        winsound.PlaySound(
+            "SystemExclamation",
+            winsound.SND_ALIAS | winsound.SND_ASYNC | winsound.SND_NODEFAULT,
+        )
+    except (ImportError, OSError, RuntimeError):
+        print("[AVISO] Alerta sonora no disponible en este equipo.")
+
+
 def renderizar_vista(resultado, personas: list[Persona], alertas: list, modo: str, avisos_activos=None):
     """Muestra el esqueleto sin taparlo con rótulos gigantes.
 
@@ -181,6 +193,8 @@ def main() -> None:
     parser.add_argument("--guardar-video", action="store_true")
     parser.add_argument("--guardar-clips", action="store_true",
                         help="Clips de ~2 s antes y 3 s despues de avisos, solo agresiones")
+    parser.add_argument("--alerta-sonora", action="store_true",
+                        help="Sonido Windows por nuevo candidato; solo agresiones")
     parser.add_argument(
         "--guardar-capturas", action="store_true",
         help="Guardar sólo fotogramas con avisos (máximo 20 por sesión)",
@@ -198,6 +212,8 @@ def main() -> None:
         parser.error("--filtro-brazos sólo está disponible en modo brazos")
     if args.guardar_clips and args.modo != "agresiones":
         parser.error("--guardar-clips solo existe en modo agresiones")
+    if args.alerta_sonora and args.modo != "agresiones":
+        parser.error("--alerta-sonora solo existe en modo agresiones")
     def nuevo_detector():
         return (
             DetectorGestosDirigidos(
@@ -345,6 +361,8 @@ def main() -> None:
                     else:
                         print(f"[REVISAR] Fotograma {fotograma} ID {alerta.track_id}: postura horizontal persistente (no caída confirmada)")
 
+                if args.modo == "agresiones" and args.alerta_sonora and alertas:
+                    aviso_sonoro()
                 if args.modo == "agresiones":
                     presentes = {p.track_id: p for p in personas if p.track_id is not None}
                     for ident, (tipo, otro, ultimo) in list(avisos_activos.items()):

@@ -232,6 +232,14 @@ class PruebasIniciadores(unittest.TestCase):
         self.assertIn("--guardar-clips", cmd)
         self.assertNotIn("--max-fotogramas", cmd)
 
+    def test_sonido_solo_nuevos_candidatos_de_agresiones(self):
+        cmd = iniciar_intencion.construir_comando_demo(
+            "camara:1", modo="agresiones", alerta_sonora=True, mostrar=False)
+        self.assertIn("--alerta-sonora", cmd)
+        with self.assertRaises(ValueError):
+            iniciar_intencion.construir_comando_demo(
+                "prueba.mp4", modo="posturas", alerta_sonora=True)
+
     def test_clips_solo_agresiones(self):
         with self.assertRaises(ValueError):
             iniciar_intencion.construir_comando_demo(

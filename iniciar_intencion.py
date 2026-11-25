@@ -41,6 +41,7 @@ def construir_comando_demo(
     imgsz: int | None = None,
     conf: float | None = None,
     guardar_clips: bool = False,
+    alerta_sonora: bool = False,
 ) -> list[str]:
     """Sólo lanza la demostración conductual, nunca el detector de cascos."""
     if not fuente.strip() or max_fotogramas < 0:
@@ -74,6 +75,10 @@ def construir_comando_demo(
         if modo != "agresiones":
             raise ValueError("Los clips de eventos requieren --demo-agresiones")
         cmd.append("--guardar-clips")
+    if alerta_sonora:
+        if modo != "agresiones":
+            raise ValueError("La alerta sonora requiere --demo-agresiones")
+        cmd.append("--alerta-sonora")
     if max_fotogramas:
         cmd.extend(["--max-fotogramas", str(max_fotogramas)])
     if imgsz is not None:
@@ -161,6 +166,8 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--guardar-video", action="store_true")
     parser.add_argument("--guardar-clips", action="store_true",
                         help="Clips cortos por aviso (solo modo agresiones)")
+    parser.add_argument("--alerta-sonora", action="store_true",
+                        help="Aviso de Windows por evento candidato (solo modo agresiones)")
     parser.add_argument(
         "--filtro-brazos", action="store_true",
         help="Filtro experimental de saltos de muñeca, sólo en demo-brazos",
@@ -207,7 +214,8 @@ def main(argv: list[str] | None = None) -> int:
             if modo == "violencia":
                 if args.usb is not None or args.wifi or not args.fuente:
                     raise ValueError("VideoMAE usa solo --fuente archivo.mp4, no camaras")
-                if args.guardar_video or args.guardar_capturas or args.filtro_brazos or args.guardar_clips:
+                if (args.guardar_video or args.guardar_capturas or args.filtro_brazos
+                        or args.guardar_clips or args.alerta_sonora):
                     raise ValueError("VideoMAE solo guarda CSV; no admite video/capturas/filtro brazos")
                 cmd = construir_comando_acciones(
                     args.fuente, device=args.device,
@@ -215,7 +223,8 @@ def main(argv: list[str] | None = None) -> int:
                 print("Analizando video temporal experimental, NO agresion confirmada:", args.fuente)
                 return subprocess.run(cmd, cwd=RAIZ, check=False).returncode
             if modo == "armas":
-                if args.guardar_capturas or args.filtro_brazos or args.guardar_clips:
+                if (args.guardar_capturas or args.filtro_brazos or args.guardar_clips
+                        or args.alerta_sonora):
                     raise ValueError("Modo armas no permite capturas ni filtro de brazos")
                 fuente = seleccionar_fuente(args.fuente, args.usb, args.wifi)
                 if fuente is None:
@@ -236,6 +245,7 @@ def main(argv: list[str] | None = None) -> int:
                 guardar_video=args.guardar_video,
                 guardar_capturas=args.guardar_capturas,
                 guardar_clips=args.guardar_clips,
+                alerta_sonora=args.alerta_sonora,
                 filtro_brazos=args.filtro_brazos,
                 max_fotogramas=args.max_fotogramas,
                 modo=modo,
