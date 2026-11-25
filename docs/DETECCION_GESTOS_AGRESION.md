@@ -77,3 +77,21 @@ queda intacto y no se fusiona a `main` sin validación.
 Con `--alerta-sonora` en Windows se reproduce un aviso corto no bloqueante
 cuando se genera un nuevo candidato. No es alarma de emergencia ni se
 reproduce por cada fotograma; es sólo una señal para revisión.
+
+## Pulido de continuidad espacial (experimental)
+
+El detector ahora compara el movimiento de la muñeca **respecto del
+hombro** para que un desplazamiento global del cuerpo/cámara no cuente
+automáticamente como golpe. Requiere movimiento mínimo observable,
+orientación hacia otra persona y continuidad geométrica de **las dos**
+personas observadas. Si un ID cambia, una caja salta o hay pérdida
+temporal de la pista, se reinician las rachas del par.
+
+Se mantienen los textos "POSIBLE INTENTO DE AGRESION" y
+"POSIBLE AGRESION" sólo como **candidatos para revisión**: una
+superposición de muñeca y cuerpo NO prueba contacto ni intencionalidad.
+
+Para comparar: probar la misma secuencia con personas quietas, saludos,
+baile, desplazamientos de cámara y contacto simulado, midiendo falsos
+avisos y omisiones. Los resultados no constituyen una métrica de
+precisión real sin evaluación etiquetada.

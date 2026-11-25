@@ -93,6 +93,7 @@ def construir_comando_armas(
     fuente: str, mostrar: bool = True, guardar_video: bool = False,
     max_fotogramas: int = 0, imgsz: int | None = None,
     conf: float | None = None, modelo: str | None = None,
+    guardar_capturas: bool = False,
 ) -> list[str]:
     """Lanza el detector especializado de objetos, nunca los pesos viales."""
     if not fuente.strip() or max_fotogramas < 0:
@@ -104,6 +105,8 @@ def construir_comando_armas(
         raise ValueError("conf debe estar entre 0 (exclusivo) y 1")
     cmd = [sys.executable, "-m", "modules.behavioral.weapon_detector",
            "--fuente", validar_fuente(fuente)]
+    if guardar_capturas:
+        cmd.append("--guardar-capturas")
     if mostrar:
         cmd.append("--mostrar")
     if guardar_video:
@@ -223,16 +226,16 @@ def main(argv: list[str] | None = None) -> int:
                 print("Analizando video temporal experimental, NO agresion confirmada:", args.fuente)
                 return subprocess.run(cmd, cwd=RAIZ, check=False).returncode
             if modo == "armas":
-                if (args.guardar_capturas or args.filtro_brazos or args.guardar_clips
-                        or args.alerta_sonora):
-                    raise ValueError("Modo armas no permite capturas ni filtro de brazos")
+                if (args.filtro_brazos or args.guardar_clips or args.alerta_sonora):
+                    raise ValueError("Modo armas no permite clips, filtro brazos ni sonido de agresiones")
                 fuente = seleccionar_fuente(args.fuente, args.usb, args.wifi)
                 if fuente is None:
                     return 0
                 cmd = construir_comando_armas(
                     fuente, mostrar=not args.sin_mostrar,
                     guardar_video=args.guardar_video, max_fotogramas=args.max_fotogramas,
-                    imgsz=args.imgsz, conf=args.conf, modelo=args.modelo_armas)
+                    imgsz=args.imgsz, conf=args.conf, modelo=args.modelo_armas,
+                    guardar_capturas=args.guardar_capturas)
                 print("Deteccion de posibles objetos para revision, NO amenaza confirmada:", fuente)
                 return subprocess.run(cmd, cwd=RAIZ, check=False).returncode
             fuente = seleccionar_fuente(args.fuente, args.usb, args.wifi)

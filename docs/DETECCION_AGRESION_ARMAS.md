@@ -53,3 +53,35 @@ Pruebas sin pesos: `python -m unittest tests.test_armas_acciones_experimentales 
 Se puede preparar sin ejecutar ZIP con `scripts/preparar_dataset_armas.py` y entrenar optativamente con `scripts/entrenar_armas.py`. Los pesos `gun` de una sola clase tambien son validos para el detector de armas; este indicara que no puede detectar cuchillos. Consulta `docs/DATASET_ARMAS_ROBOFLOW.md`.
 
 El iniciador `python iniciar_intencion.py --demo-armas` conecta el detector especializado; `--demo-violencia --fuente archivo.mp4` ejecuta la prueba temporal ya existente. Ninguno demuestra una amenaza o agresion. No se han incorporado pesos, imagenes ni videos al repositorio.
+
+## Pulido de candidatos de armas y registro (experimental)
+
+El detector `weapon_detector.py` ahora usa `procesar_objetos()`: exige
+que **el mismo recuadro** de `gun` o `knife` permanezca en la misma
+región durante varios fotogramas, con emparejamiento espacial y
+enfriamiento por pista. Detectar "gun" en un lugar distinto en cada
+fotograma **no suma una sola racha de confirmación**. Esto puede reducir
+falsas alertas, pero también omitir objetos pequeños, ocultos o que
+cambian rápidamente de posición. El número de ID es temporal y **no
+se vincula con una persona**.
+
+Ejemplo, si ya cuentas con pesos especializados verificados:
+
+```bat
+Iniciar_Intencion.bat --demo-armas --usb 1 --modelo-armas "modelos_intenciones\armas\best.pt" --imgsz 480 --conf 0.35 --guardar-video --guardar-capturas
+```
+
+En el CSV `resultados/conductual/candidatos_armas_*.csv` se incluyen
+timestamp UTC, fotograma, segundo de la fuente, clase, tipo, ID local
+del objeto, confianza y caja `x1/y1/x2/y2`. Las capturas en
+`capturas_armas_*/` sólo se guardan ante un candidato nuevo y se
+limitan a 20 por sesión. El recuadro ámbar significa detección visual;
+el rojo representa un **candidato para revisión**, nunca un arma
+real confirmada o una amenaza.
+
+En laptop con 4 GB RAM se puede probar `--imgsz 480` para reducir
+carga, aunque puede disminuir sensibilidad a objetos lejanos. Sin
+pesos `.pt` especializados y videos positivos/negativos etiquetados
+no puede demostrarse la eficacia de la detección de pistolas o
+cuchillos. El ZIP `armas.v2i.yolov8.zip` aún NO proporciona pesos
+entrenados, y sólo contiene `gun`, no `knife`.

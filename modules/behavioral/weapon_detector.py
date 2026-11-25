@@ -5,11 +5,12 @@ No usa el modelo vial ni cambia eventos de proximidad.
 """
 import argparse
 import csv
+import time
 from datetime import datetime, timezone
 from math import isfinite
 from pathlib import Path
 
-from .weapon_events import ConfirmadorArmas, nombres_armas
+from .weapon_events import ConfirmadorArmas, nombres_armas, solape
 from .person_tracker import fuente_video
 from modules.camera_recovery import recuperar_flujo
 
@@ -26,6 +27,8 @@ def main(argv=None):
     parser.add_argument("--min-fotogramas", type=int, default=3)
     parser.add_argument("--max-fotogramas", type=int, default=0)
     parser.add_argument("--guardar-video", action="store_true")
+    parser.add_argument("--guardar-capturas", action="store_true",
+                        help="Guardar solo fotogramas con candidatos (hasta 20 por sesion)")
     parser.add_argument("--mostrar", action="store_true")
     args = parser.parse_args(argv)
     if (not isfinite(args.conf) or not 0 < args.conf <= 1 or args.imgsz < 64
@@ -60,13 +63,21 @@ def main(argv=None):
     sufijo = datetime.now(timezone.utc).strftime("%Y%m%d_%H%M%S_%f")
     csv_path = carpeta / ("candidatos_armas_" + sufijo + ".csv")
     video_path = carpeta / ("candidatos_armas_" + sufijo + ".mp4")
+    carpeta_capturas = carpeta / ("capturas_armas_" + sufijo)
     n = 0
     avisos = 0
+    capturas_guardadas = 0
+    inicio_reloj = time.monotonic()
+    es_video = isinstance(fuente_captura, str) and Path(fuente_captura).is_file()
     writer_video = None
     try:
         with csv_path.open("w", newline="", encoding="utf-8") as f:
             registro = csv.writer(f)
-            registro.writerow(("fotograma", "segundo_aprox", "clase", "tipo", "estado"))
+            registro.writerow((
+                "timestamp_utc", "fotograma", "segundo_fuente",
+                "clase", "tipo", "estado", "objeto_id",
+                "confianza", "x1", "y1", "x2", "y2",
+            ))
             while True:
                 ok, imagen = captura.read()
                 if not ok or imagen is None:
@@ -96,27 +107,55 @@ def main(argv=None):
                     if clase is None:
                         continue
                     objetos.append((clase, float(score), xyxy))
-                nuevos = confirmador.procesar(n, [x[0] for x in objetos])
-                for clase in nuevos:
+                # No acumular rachas por clase: cada caja debe ser estable.
+                nuevos = confirmador.procesar_objetos(n, objetos)
+                if es_video:
+                    pos_ms = captura.get(cv2.CAP_PROP_POS_MSEC)
+                    instante_s = (pos_ms / 1000.0 if isfinite(pos_ms) and pos_ms > 0
+                                  else n / fps)
+                else:
+                    instante_s = time.monotonic() - inicio_reloj
+                for candidato in nuevos:
                     avisos += 1
+                    x1, y1, x2, y2 = candidato.caja
                     registro.writerow((
-                        n, round(n / fps, 2), clase, "objeto_potencial",
-                        "revisar_manualmente",
+                        datetime.now(timezone.utc).isoformat(), n,
+                        round(instante_s, 3), candidato.clase,
+                        "objeto_potencial", "revisar_manualmente",
+                        candidato.objeto_id, round(candidato.confianza, 4),
+                        round(x1), round(y1), round(x2), round(y2),
                     ))
                     f.flush()
-                    print(f"[REVISAR] fotograma {n} {TRADUCIR[clase]} (no confirmado)")
-                if args.guardar_video or args.mostrar:
+                    print(f"[REVISAR] fotograma {n}, objeto {candidato.objeto_id}: "
+                          f"{TRADUCIR[candidato.clase]} (no confirmado)")
+                if (args.guardar_video or args.mostrar
+                        or (args.guardar_capturas and nuevos
+                            and capturas_guardadas < 20)):
                     vista = imagen.copy()
                     for clase, conf, caja in objetos:
                         x1, y1, x2, y2 = map(int, caja)
-                        cv2.rectangle(vista, (x1, y1), (x2, y2), (0, 160, 255), 2)
-                        texto = f"{TRADUCIR[clase]} {conf:.2f}"
+                        revisable = any(
+                            cand.clase == clase and solape(cand.caja, caja) > .95
+                            for cand in nuevos
+                        )
+                        color = (40, 40, 235) if revisable else (0, 160, 255)
+                        cv2.rectangle(vista, (x1, y1), (x2, y2), color, 2)
+                        texto = (f"{TRADUCIR[clase]} {conf:.2f} "
+                                 + ("REVISAR" if revisable else "OBSERVADO"))
                         cv2.putText(vista, texto, (max(0,x1), max(20,y1-5)),
-                                    cv2.FONT_HERSHEY_SIMPLEX, 0.45, (0,160,255), 1)
+                                    cv2.FONT_HERSHEY_SIMPLEX, 0.45, color, 1)
                     alto, ancho = vista.shape[:2]
                     cv2.putText(vista, "CANDIDATOS PARA REVISION - NO CONFIRMADO",
                                 (8, max(16, alto-12)), cv2.FONT_HERSHEY_SIMPLEX,
                                 0.47, (255,255,255), 1)
+                    if (args.guardar_capturas and nuevos
+                            and capturas_guardadas < 20):
+                        carpeta_capturas.mkdir(parents=True, exist_ok=True)
+                        ruta_captura = carpeta_capturas / f"fotograma_{n:06d}.jpg"
+                        if not cv2.imwrite(str(ruta_captura), vista):
+                            raise OSError(f"No se pudo guardar captura: {ruta_captura}")
+                        capturas_guardadas += 1
+                        print("[CAPTURA PARA REVISION]", ruta_captura)
                     if args.guardar_video:
                         if writer_video is None:
                             writer_video = cv2.VideoWriter(
@@ -141,6 +180,8 @@ def main(argv=None):
     print(f"Registro local: {csv_path}")
     if args.guardar_video:
         print(f"Video anotado: {video_path}")
+    if args.guardar_capturas:
+        print(f"Capturas de candidatos: {capturas_guardadas}, carpeta: {carpeta_capturas}")
 
 
 if __name__ == "__main__":

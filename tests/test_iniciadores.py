@@ -191,6 +191,19 @@ class PruebasIniciadores(unittest.TestCase):
         self.assertNotIn("modules.traffic", " ".join(cmd))
         self.assertIn("--modelo", cmd)
 
+    def test_armas_aceptan_capturas_solo_cuando_hay_candidatos(self):
+        cmd = iniciar_intencion.construir_comando_armas(
+            "camara:1", mostrar=False, guardar_capturas=True)
+        self.assertIn("--guardar-capturas", cmd)
+        with patch("iniciar_intencion.subprocess.run") as ejecutar:
+            ejecutar.return_value.returncode = 0
+            resultado = iniciar_intencion.main([
+                "--demo-armas", "--usb", "1", "--sin-mostrar",
+                "--guardar-capturas",
+            ])
+        self.assertEqual(resultado, 0)
+        self.assertIn("--guardar-capturas", ejecutar.call_args.args[0])
+
     def test_lanzador_violencia_solo_video_local(self):
         cmd = iniciar_intencion.construir_comando_acciones(
             "prueba.mp4", umbral=0.75, max_ventanas=2)
