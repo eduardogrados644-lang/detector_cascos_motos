@@ -47,3 +47,9 @@ Salida: `resultados/conductual/candidatos_violencia_*.csv`, con probabilidades *
 5. Mantener el módulo VIAL sin cambios; fusionar a `main` únicamente tras pruebas locales reproducibles.
 
 Pruebas sin pesos: `python -m unittest tests.test_armas_acciones_experimentales -v`.
+
+## Dataset Roboflow del usuario (gun, NO knife)
+
+Se puede preparar sin ejecutar ZIP con `scripts/preparar_dataset_armas.py` y entrenar optativamente con `scripts/entrenar_armas.py`. Los pesos `gun` de una sola clase tambien son validos para el detector de armas; este indicara que no puede detectar cuchillos. Consulta `docs/DATASET_ARMAS_ROBOFLOW.md`.
+
+El iniciador `python iniciar_intencion.py --demo-armas` conecta el detector especializado; `--demo-violencia --fuente archivo.mp4` ejecuta la prueba temporal ya existente. Ninguno demuestra una amenaza o agresion. No se han incorporado pesos, imagenes ni videos al repositorio.

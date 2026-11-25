@@ -36,7 +36,7 @@ class ConfirmadorArmas:
 
 def nombres_armas(nombres):
     """Devuelve id->clase para un modelo Detect con etiquetas gun y knife."""
-    if isinstance(nombres, list):
+    if isinstance(nombres, (list, tuple)):
         nombres = dict(enumerate(nombres))
     if not isinstance(nombres, dict):
         raise ValueError("Las clases del modelo deben ser dict o lista")
@@ -47,9 +47,9 @@ def nombres_armas(nombres):
         normalizado = nombre.strip().lower()
         if normalizado in ("gun", "knife"):
             resultado[int(indice)] = normalizado
-    if set(resultado.values()) != {"gun", "knife"}:
+    if not resultado:
         raise ValueError(
-            "Este prototipo requiere un modelo especializado con ambas clases: gun y knife. "
+            "Se requiere un modelo especializado con clase gun y/o knife. "
             "El modelo COCO común no detecta pistolas."
         )
     return resultado

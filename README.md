@@ -4,7 +4,7 @@ Proyecto experimental de visión computacional con **dos módulos independientes
 
 **Control vial:** los scripts existentes detectan cascos, personas sin casco y posibles matrículas de acuerdo con las clases reales del dataset. El detector complementario de personas y motocicletas usa pesos COCO por separado. Falta asociar objetos y comprobar infracciones.
 
-**Análisis conductual:** prueba de estimación de pose con sus propios pesos YOLO11 Pose. Solo registra candidatos de postura horizontal persistente, NO reconoce armas, violencia, caídas confirmadas ni intenciones. Estos objetivos están pendientes de modelos, datos y pruebas específicos.
+**Análisis conductual:** módulos independientes de pose, proximidad, brazos, candidatos de armas mediante pesos especializados y clasificación temporal experimental de video. Los detectores de armas y violencia todavía NO están validados; no identifican intenciones, culpables ni delitos.
 
 ## Instalación con Visual Studio Code en Windows
 
@@ -341,3 +341,15 @@ Validación pendiente en Windows:
 Revisar \`[CASCO INCIERTO]\` y el nuevo CSV, cotejando las cajas amarillas con
 el video fuente. Cero contradicciones no demuestra que los cascos estén bien
 clasificados.
+
+
+## Ensayos de armas y posible violencia (experimental)
+
+Se incorpora el flujo del dataset Roboflow de pistolas del usuario: `scripts/preparar_dataset_armas.py`, `scripts/entrenar_armas.py` y pruebas sin pesos. El ZIP y las imagenes quedan locales; no hay un modelo nuevo entrenado ni soporte de cuchillos en ese dataset. El iniciador conductual ahora ofrece:
+
+```bat
+python iniciar_intencion.py --demo-armas --fuente "videos_prueba\ejemplo.mp4" --modelo-armas "modelos_intenciones\armas_pistolas\best.pt" --guardar-video --sin-mostrar
+python iniciar_intencion.py --demo-violencia --fuente "datos_intenciones\evaluacion\behave\fragmentos\04_interaccion_fisica_simulada_136s_152s.mp4"
+```
+
+Ambos requieren modelos externos cargables y revision humana. Consulta `docs/DATASET_ARMAS_ROBOFLOW.md` y `docs/DETECCION_AGRESION_ARMAS.md`. Los modulos viales no cambian.

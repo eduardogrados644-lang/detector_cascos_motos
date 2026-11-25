@@ -62,3 +62,9 @@ datos_intenciones/**/*.zip
 # Pesos externos de armas y modelos especializados; no subir a repo público
 modelos_intenciones/**/*.pt
 modelos_intenciones/**/*.safetensors
+
+# Dataset de pistolas importado localmente desde ZIP (imagenes y etiquetas)
+datos_intenciones/entrenamiento/armas_gun/
+# Pesos de entrenamiento nuevos y otros archivos generados
+resultados/entrenamientos/armas/
+modelos_intenciones/armas_pistolas/

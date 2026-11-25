@@ -1,7 +1,7 @@
 """Punto de entrada independiente del apartado conductual.
 
-Preparado para incorporar futuros modelos de armas y acciones observables.
-Por ahora sólo permite ejecutar el prototipo experimental de postura YOLO Pose.
+Inicia prototipos separados de pose, armas y analisis temporal de video.
+Todos son experimentales y requieren modelos y evaluaciones independientes.
 No mezcla pesos ni salidas del módulo de cascos y NO infiere intenciones.
 """
 import argparse
@@ -22,7 +22,9 @@ def mostrar_estado() -> None:
     print("Disponible: prueba de posturas horizontales con YOLO Pose.")
     print("Disponible: proximidad persistente entre personas; NO es pelea.")
     print("Disponible: brazos elevados y desplazamientos aparentes (experimental).")
-    print("Pendiente: modelos validados de armas, objetos y acciones violentas.")
+    print("Disponible: candidatos de armas con pesos especializados (gun/knife).")
+    print("Disponible: clasificacion temporal VideoMAE solo sobre archivos de video.")
+    print("Pendiente: validacion real, precision, y deteccion de acciones concretas.")
     print("ATENCIÓN: una postura u objeto no revela la intención de una persona.")
     print("Los resultados nunca son acusaciones ni eventos confirmados.")
 
@@ -75,6 +77,53 @@ def construir_comando_demo(
     return cmd
 
 
+
+def construir_comando_armas(
+    fuente: str, mostrar: bool = True, guardar_video: bool = False,
+    max_fotogramas: int = 0, imgsz: int | None = None,
+    conf: float | None = None, modelo: str | None = None,
+) -> list[str]:
+    """Lanza el detector especializado de objetos, nunca los pesos viales."""
+    if not fuente.strip() or max_fotogramas < 0:
+        raise ValueError("Fuente o limite invalido")
+    if imgsz is not None and (type(imgsz) is not int or imgsz < 64):
+        raise ValueError("imgsz debe ser entero >= 64")
+    if conf is not None and (not isinstance(conf, (int, float))
+                             or not math.isfinite(conf) or not 0 < conf <= 1):
+        raise ValueError("conf debe estar entre 0 (exclusivo) y 1")
+    cmd = [sys.executable, "-m", "modules.behavioral.weapon_detector",
+           "--fuente", validar_fuente(fuente)]
+    if mostrar:
+        cmd.append("--mostrar")
+    if guardar_video:
+        cmd.append("--guardar-video")
+    if max_fotogramas:
+        cmd.extend(["--max-fotogramas", str(max_fotogramas)])
+    if imgsz is not None:
+        cmd.extend(["--imgsz", str(imgsz)])
+    if conf is not None:
+        cmd.extend(["--conf", str(conf)])
+    if modelo:
+        cmd.extend(["--modelo", modelo])
+    return cmd
+
+
+def construir_comando_acciones(
+    fuente: str, device: str = "cpu", umbral: float = 0.80,
+    max_ventanas: int = 0,
+) -> list[str]:
+    """VideoMAE solamente admite archivos locales, no camaras."""
+    if (not fuente.strip() or fuente.startswith(("camara:", "rtsp://", "http://", "https://"))
+            or device not in ("cpu", "cuda") or max_ventanas < 0
+            or not math.isfinite(umbral) or not 0 < umbral <= 1):
+        raise ValueError("Acciones: indica video local y parametros validos")
+    cmd = [sys.executable, "-m", "modules.behavioral.action_video",
+           "--fuente", fuente, "--device", device, "--umbral", str(umbral)]
+    if max_ventanas:
+        cmd.extend(["--max-ventanas", str(max_ventanas)])
+    return cmd
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(
         description="Iniciador reservado para análisis conductual independiente"
@@ -86,6 +135,8 @@ def main(argv: list[str] | None = None) -> int:
     )
     demos.add_argument("--demo-proximidad", action="store_true", help="Cercanía persistente, no violencia")
     demos.add_argument("--demo-brazos", action="store_true", help="Movimientos aparentes de brazos, no agresión")
+    demos.add_argument("--demo-armas", action="store_true", help="Posibles pistolas/cuchillos con modelo especializado")
+    demos.add_argument("--demo-violencia", action="store_true", help="Clasificacion temporal de video local, no agresion confirmada")
     fuentes = parser.add_mutually_exclusive_group()
     fuentes.add_argument("--fuente", help="Archivo de video o URL RTSP/MJPEG")
     fuentes.add_argument(
@@ -109,29 +160,60 @@ def main(argv: list[str] | None = None) -> int:
         "--guardar-capturas", action="store_true",
         help="Guardar capturas de avisos, opcional y sólo en resultados locales"
     )
+    parser.add_argument("--modelo-armas", help="Pesos YOLO Detect gun/knife para --demo-armas")
+    parser.add_argument("--umbral-violencia", type=float, default=0.80)
+    parser.add_argument("--max-ventanas", type=int, default=0)
+    parser.add_argument("--device", choices=("cpu", "cuda"), default="cpu")
     parser.add_argument("--estado", action="store_true")
     args = parser.parse_args(argv)
     mostrar_estado()
     if args.estado:
         return 0
     try:
-        demo = args.demo_posturas or args.demo_proximidad or args.demo_brazos
-        modo = ("brazos" if args.demo_brazos else
+        demo = (args.demo_posturas or args.demo_proximidad or args.demo_brazos
+                or args.demo_armas or args.demo_violencia)
+        modo = ("violencia" if args.demo_violencia else "armas" if args.demo_armas else
+                "brazos" if args.demo_brazos else
                 "proximidad" if args.demo_proximidad else "posturas")
         if not demo:
             print("\n1. Probar el prototipo de posturas (experimental)")
             print("2. Observar proximidad persistente (no significa pelea)")
             print("3. Observar brazos elevados y movimientos aparentes")
+            print("4. Buscar posibles armas (requiere modelo de armas)")
+            print("5. Clasificar posibles escenas violentas (requiere video local)")
             print("0. Salir sin iniciar análisis")
             opcion = input("Opción: ").strip()
             if opcion == "0":
                 return 0
-            if opcion not in ("1", "2", "3"):
+            if opcion not in ("1", "2", "3", "4", "5"):
                 raise ValueError("Opción no válida")
-            modo = ("brazos" if opcion == "3" else
+            modo = ("violencia" if opcion == "5" else "armas" if opcion == "4" else
+                    "brazos" if opcion == "3" else
                     "proximidad" if opcion == "2" else "posturas")
             demo = True
         if demo:
+            if modo == "violencia":
+                if args.usb is not None or args.wifi or not args.fuente:
+                    raise ValueError("VideoMAE usa solo --fuente archivo.mp4, no camaras")
+                if args.guardar_video or args.guardar_capturas or args.filtro_brazos:
+                    raise ValueError("VideoMAE solo guarda CSV; no admite video/capturas/filtro brazos")
+                cmd = construir_comando_acciones(
+                    args.fuente, device=args.device,
+                    umbral=args.umbral_violencia, max_ventanas=args.max_ventanas)
+                print("Analizando video temporal experimental, NO agresion confirmada:", args.fuente)
+                return subprocess.run(cmd, cwd=RAIZ, check=False).returncode
+            if modo == "armas":
+                if args.guardar_capturas or args.filtro_brazos:
+                    raise ValueError("Modo armas no permite capturas ni filtro de brazos")
+                fuente = seleccionar_fuente(args.fuente, args.usb, args.wifi)
+                if fuente is None:
+                    return 0
+                cmd = construir_comando_armas(
+                    fuente, mostrar=not args.sin_mostrar,
+                    guardar_video=args.guardar_video, max_fotogramas=args.max_fotogramas,
+                    imgsz=args.imgsz, conf=args.conf, modelo=args.modelo_armas)
+                print("Deteccion de posibles objetos para revision, NO amenaza confirmada:", fuente)
+                return subprocess.run(cmd, cwd=RAIZ, check=False).returncode
             fuente = seleccionar_fuente(args.fuente, args.usb, args.wifi)
             if fuente is None:
                 print("Se canceló la selección de fuente conductual.")

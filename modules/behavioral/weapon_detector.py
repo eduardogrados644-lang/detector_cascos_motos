@@ -43,6 +43,11 @@ def main(argv=None):
     if getattr(modelo, "task", None) != "detect":
         raise ValueError("Se requiere un modelo YOLO Detect de armas")
     clases = nombres_armas(modelo.names)
+    print("Clases de armas disponibles:", ", ".join(sorted(set(clases.values()))))
+    if "knife" not in clases.values():
+        print("AVISO: estos pesos NO permiten detectar cuchillos.")
+    if "gun" not in clases.values():
+        print("AVISO: estos pesos NO permiten detectar pistolas.")
     captura = abrir_captura(fuente_video(args.fuente))
     fps = captura.get(cv2.CAP_PROP_FPS)
     if not isfinite(fps) or fps <= 0:

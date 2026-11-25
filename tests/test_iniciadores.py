@@ -181,6 +181,34 @@ class PruebasIniciadores(unittest.TestCase):
         with self.assertRaises(ValueError):
             iniciar_intencion.construir_comando_demo("helmet.mp4", modo="violencia")
 
+    def test_armas_lanzador_no_mezcla_modelos_viales(self):
+        cmd = iniciar_intencion.construir_comando_armas(
+            "camara:1", mostrar=False, guardar_video=True,
+            modelo="modelos_intenciones/armas_pistolas/best.pt")
+        self.assertIn("modules.behavioral.weapon_detector", cmd)
+        self.assertIn("--guardar-video", cmd)
+        self.assertNotIn("--mostrar", cmd)
+        self.assertNotIn("modules.traffic", " ".join(cmd))
+        self.assertIn("--modelo", cmd)
+
+    def test_lanzador_violencia_solo_video_local(self):
+        cmd = iniciar_intencion.construir_comando_acciones(
+            "prueba.mp4", umbral=0.75, max_ventanas=2)
+        self.assertIn("modules.behavioral.action_video", cmd)
+        self.assertIn("--max-ventanas", cmd)
+        with self.assertRaises(ValueError):
+            iniciar_intencion.construir_comando_acciones("camara:1")
+
+    def test_iniciador_armas_llama_modulo_aislado(self):
+        with patch("iniciar_intencion.subprocess.run") as ejecutar:
+            ejecutar.return_value.returncode = 0
+            codigo = iniciar_intencion.main([
+                "--demo-armas", "--fuente", "camara:1", "--sin-mostrar",
+                "--modelo-armas", "modelos_intenciones/armas_pistolas/best.pt"
+            ])
+        self.assertEqual(codigo, 0)
+        self.assertIn("modules.behavioral.weapon_detector", ejecutar.call_args.args[0])
+
 
 if __name__ == "__main__":
     unittest.main()

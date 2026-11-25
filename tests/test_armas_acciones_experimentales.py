@@ -17,8 +17,10 @@ class PruebasArmamento(unittest.TestCase):
         self.assertEqual(a.procesar(1,["gun","knife","gun"]),["gun","knife"])
     def test_nombres_especializados(self):
         self.assertEqual(nombres_armas({0:"gun",1:"knife"}),{0:"gun",1:"knife"})
+        self.assertEqual(nombres_armas({0:"gun"}), {0:"gun"})
+        self.assertEqual(nombres_armas({43:"knife"}), {43:"knife"})
         with self.assertRaises(ValueError):
-            nombres_armas({43:"knife", 0:"person"})
+            nombres_armas({0:"person"})
     def test_fotogramas_crecientes(self):
         a=ConfirmadorArmas()
         a.procesar(1,[])
