@@ -353,3 +353,8 @@ python iniciar_intencion.py --demo-violencia --fuente "datos_intenciones\evaluac
 ```
 
 Ambos requieren modelos externos cargables y revision humana. Consulta `docs/DATASET_ARMAS_ROBOFLOW.md` y `docs/DETECCION_AGRESION_ARMAS.md`. Los modulos viales no cambian.
+
+
+## Cámara integrada opcional para Cascos
+
+El modo VIAL permite seleccionar explícitamente la webcam integrada del PC con `Iniciar_Cascos.bat --integrada` o mediante el menú de `Iniciar_Cascos.bat`. Siguen disponibles USB externa, celular/tablet Android y archivos. No se activa automáticamente ni afecta las cámaras del apartado Intenciones. Consulta `docs/CAMARAS_CASCOS.md`.

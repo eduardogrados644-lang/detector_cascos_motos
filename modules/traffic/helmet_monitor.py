@@ -13,7 +13,7 @@ from pathlib import Path
 import cv2
 from ultralytics import YOLO
 
-from modules.camera_sources import abrir_captura
+from modules.camera_sources import abrir_captura_vial
 from .association import normalizar_clase
 from .helmet_summary import resumen_cascos
 from .road_monitor import crear_salida, ruta_modelo
@@ -40,7 +40,7 @@ def ejecutar(args) -> None:
         raise ValueError("Los pesos deben contener las clases con casco y sin casco")
 
     fuente = resolver_fuente(args.fuente)
-    captura = abrir_captura(fuente)
+    captura = abrir_captura_vial(fuente)
     salida = crear_salida(RAIZ / "resultados" / "solo_cascos")
     fps_original = float(captura.get(cv2.CAP_PROP_FPS))
     if not math.isfinite(fps_original) or fps_original <= 0:

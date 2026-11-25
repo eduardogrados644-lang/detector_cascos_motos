@@ -25,8 +25,7 @@ class TestFuentesExternas(unittest.TestCase):
         for valor in ("0", "camara:0", "camara:-1", ""):
             with self.subTest(valor=valor), self.assertRaises(ValueError):
                 validar_fuente(valor)
-        with self.assertRaises(ValueError):
-            iniciar_cascos.construir_comando("camara:0")
+        self.assertIn("camara:0", iniciar_cascos.construir_comando("camara:0"))
         with self.assertRaises(ValueError):
             iniciar_intencion.construir_comando_demo("0")
 

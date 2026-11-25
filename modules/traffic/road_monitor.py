@@ -25,7 +25,7 @@ from .association import (
     relacionar,
 )
 from .vehicle_detector import ids_objetivo, resolver_fuente
-from modules.camera_sources import abrir_captura
+from modules.camera_sources import abrir_captura_vial
 
 
 RAIZ = Path(__file__).resolve().parents[2]
@@ -160,7 +160,7 @@ def ejecutar(args) -> None:
             "El modelo de cascos no contiene las clases With/Without Helmet"
         )
 
-    captura = abrir_captura(fuente)
+    captura = abrir_captura_vial(fuente)
 
     salida = crear_salida(RAIZ / "resultados" / "vial_integrado")
     confirmar = ConfirmadorEventosViales(args.confirmaciones)

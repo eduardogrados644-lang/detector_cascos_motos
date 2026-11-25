@@ -8,7 +8,7 @@ import subprocess
 import sys
 from pathlib import Path
 
-from modules.camera_sources import seleccionar_fuente, validar_fuente
+from modules.camera_sources import seleccionar_fuente_vial, validar_fuente_vial
 
 
 RAIZ = Path(__file__).resolve().parent
@@ -32,7 +32,7 @@ def construir_comando(
         raise ValueError("stride o max_fotogramas inválidos")
     if modo not in ("vial", "cascos"):
         raise ValueError("Modo inválido; utiliza vial o cascos")
-    fuente_validada = validar_fuente(fuente)
+    fuente_validada = validar_fuente_vial(fuente)
     modulo = (
         "modules.traffic.road_monitor" if modo == "vial"
         else "modules.traffic.helmet_monitor"
@@ -58,10 +58,12 @@ def main(argv: list[str] | None = None) -> int:
         description="Iniciador del apartado vial: cascos, personas y motocicletas"
     )
     fuentes = parser.add_mutually_exclusive_group()
-    fuentes.add_argument("--fuente", help="Video o URL de transmisión")
+    fuentes.add_argument("--fuente", help="Video, camara:0 (integrada), camara:1 (externa) o URL")
+    fuentes.add_argument("--integrada", action="store_true",
+                         help="Usar explicitamente la camara integrada del PC (indice 0 habitual)")
     fuentes.add_argument(
         "--usb", type=int,
-        help="Índice explícito de cámara USB EXTERNA (1 a 20); nunca se elige la integrada",
+        help="Índice de cámara USB EXTERNA (1 a 20); la integrada se elige con --integrada",
     )
     fuentes.add_argument(
         "--wifi",
@@ -79,12 +81,13 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--sin-mostrar", action="store_true")
     args = parser.parse_args(argv)
     try:
-        fuente = seleccionar_fuente(args.fuente, args.usb, args.wifi)
+        fuente = seleccionar_fuente_vial(args.fuente, args.usb, args.wifi, args.integrada)
         if fuente is None:
             print("Saliendo del apartado vial.")
             return 0
         guardar = args.guardar_video
-        if args.fuente is None and args.usb is None and args.wifi is None and not guardar:
+        if (args.fuente is None and args.usb is None and args.wifi is None
+                and not args.integrada and not guardar):
             guardar = input("¿Guardar video anotado? [s/N]: ").strip().lower() in (
                 "s", "si", "sí",
             )
@@ -101,8 +104,10 @@ def main(argv: list[str] | None = None) -> int:
         print("\nIniciando apartado VIAL. Los resultados requieren revisión humana.")
         print("Fuente solicitada:", fuente)
         print("Modo:", args.modo)
-        if fuente.startswith("camara:"):
-            print("AVISO: comprueba en la vista que el índice corresponda a la USB externa.")
+        if fuente == "camara:0":
+            print("AVISO: el indice 0 suele ser la webcam integrada. Verificalo en pantalla.")
+        elif fuente.startswith("camara:"):
+            print("AVISO: comprueba en pantalla que el indice elegido corresponda a la USB externa.")
         return subprocess.run(cmd, cwd=RAIZ, check=False).returncode
     except (EOFError, KeyboardInterrupt):
         print("\nOperación cancelada.")

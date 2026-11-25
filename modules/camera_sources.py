@@ -1,6 +1,6 @@
 """Fuentes de video compartidas por los DOS apartados, sin mezclar sus modelos.
 
-No se selecciona automáticamente la cámara integrada. Los índices de OpenCV
+La integrada solo puede seleccionarse en Cascos, nunca por defecto. Los índices de OpenCV
 varían entre equipos; el usuario debe identificar su dispositivo USB externo.
 La transmisión IP Webcam funciona para un celular/tablet Android en la misma red.
 """
@@ -100,6 +100,99 @@ def seleccionar_fuente(
     if fuente is not None:
         return validar_fuente(fuente)
     return elegir_fuente_menu()
+
+
+def validar_fuente_vial(fuente: str) -> str:
+    """Permite la webcam integrada SOLAMENTE cuando Cascos la solicita."""
+    if not isinstance(fuente, str):
+        raise ValueError("La fuente debe ser texto")
+    texto = fuente.strip()
+    if texto in ("0", "camara:0"):
+        return "camara:0"
+    return validar_fuente(fuente)
+
+
+def elegir_fuente_menu_vial() -> str | None:
+    """Menu exclusivo de Cascos: la camara integrada se elige manualmente."""
+    while True:
+        print("\n--- ORIGEN DEL VIDEO: DETECCION DE CASCOS ---")
+        print("1. Camara INTEGRADA de la laptop/PC (indice 0 habitual)")
+        print("2. Camara USB EXTERNA")
+        print("3. Camara de celular/tablet Android por Wi-Fi")
+        print("4. Video de prueba del proyecto")
+        print("5. Otro archivo de video o URL RTSP/MJPEG")
+        print("0. Salir")
+        eleccion = input("Selecciona la fuente: ").strip()
+        if eleccion == "0":
+            return None
+        if eleccion == "1":
+            print("Se intentara abrir indice 0. Verifica que sea la camara integrada.")
+            return "camara:0"
+        if eleccion == "2":
+            valor = input("Indice de la camara USB externa (1 a 20): ").strip()
+            if valor.isdecimal():
+                try:
+                    return indice_usb_externo(int(valor))
+                except ValueError as error:
+                    print("Opcion invalida:", error)
+            else:
+                print("Escribe un indice USB entre 1 y 20.")
+            continue
+        if eleccion == "3":
+            print("Inicia IP Webcam en el celular/tablet y usa la misma red Wi-Fi.")
+            url = input("URL de IP Webcam: ").strip()
+            try:
+                return normalizar_wifi(url)
+            except ValueError as error:
+                print("URL invalida:", error)
+            continue
+        if eleccion == "4":
+            return "prueba_motos.mp4"
+        if eleccion == "5":
+            ruta = input("Ruta del video o URL RTSP/MJPEG: ").strip()
+            try:
+                return validar_fuente_vial(ruta)
+            except ValueError as error:
+                print("Fuente invalida:", error)
+            continue
+        print("Opcion invalida. Elige 1, 2, 3, 4, 5 o 0.")
+
+
+def seleccionar_fuente_vial(
+    fuente: str | None = None,
+    usb: int | None = None,
+    wifi: str | None = None,
+    integrada: bool = False,
+) -> str | None:
+    """Seleccion especifica del apartado CASCOS; no afecta Intenciones."""
+    if type(integrada) is not bool:
+        raise ValueError("--integrada debe ser verdadero o falso")
+    opciones = sum((fuente is not None, usb is not None, wifi is not None, integrada))
+    if opciones > 1:
+        raise ValueError("Elige solo una fuente: --integrada, --usb, --wifi o --fuente")
+    if integrada:
+        return "camara:0"
+    if usb is not None:
+        return indice_usb_externo(usb)
+    if wifi is not None:
+        return normalizar_wifi(wifi)
+    if fuente is not None:
+        return validar_fuente_vial(fuente)
+    return elegir_fuente_menu_vial()
+
+
+def abrir_captura_vial(fuente):
+    """Permite indice 0 solo al modulo VIAL, sin fallback automatico.
+
+    En laptop ligera baja captura integrada a 640x480; la inferencia sigue
+    usando el tamano indicado por cada detector YOLO.
+    """
+    if type(fuente) is int and fuente == 0:
+        from camara_zoom import abrir_usb
+        print("Abriendo camara integrada elegida (indice 0, 640x480).")
+        print("Verifica en pantalla que el indice 0 sea realmente tu webcam.")
+        return abrir_usb(0, ancho=640, alto=480, fps=30)
+    return abrir_captura(fuente)
 
 
 def abrir_captura(fuente):
