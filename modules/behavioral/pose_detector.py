@@ -61,7 +61,12 @@ def renderizar_vista(resultado, personas: list[Persona], alertas: list,
     Los recuadros muestran rastreos y candidatos, NO agresiones confirmadas.
     Si un evento ya pasó, el panel conserva un aviso breve para que sea visible.
     """
-    vista = resultado.plot(labels=False, conf=False, line_width=2, kpt_radius=2)
+    # Dibujar solamente las poses filtradas: el plot original de YOLO
+    # incluiría posibles siluetas rechazadas por pocos keypoints fiables.
+    origen = getattr(resultado, "orig_img", None)
+    vista = (origen.copy() if origen is not None
+             else resultado.plot(labels=False, conf=False,
+                                 line_width=2, kpt_radius=2))
     altura_original, ancho_original = vista.shape[:2]
     ancho, alto, panel = dimensiones_anotadas(ancho_original, altura_original)
     if (ancho, alto) != (ancho_original, altura_original):
@@ -80,6 +85,31 @@ def renderizar_vista(resultado, personas: list[Persona], alertas: list,
         cv2.rectangle(vista, p1, p2, (0, 0, 0), grosor + 2)
         cv2.rectangle(vista, p1, p2, color, grosor)
         _rotulo(vista, texto, p1[0], p1[1] - 6, color)
+
+    # Esqueleto COCO de 17 puntos, dibujado solo con keypoints confiables.
+    # Una sombra no suele producir suficientes articulaciones coherentes.
+    conexiones = (
+        (5, 6), (5, 7), (7, 9), (6, 8), (8, 10),
+        (5, 11), (6, 12), (11, 12), (11, 13), (13, 15),
+        (12, 14), (14, 16), (0, 1), (0, 2), (1, 3), (2, 4),
+    )
+    for persona in personas:
+        for i, j in conexiones:
+            if (len(persona.puntos) > max(i, j)
+                    and persona.puntos[i][2] >= 0.40
+                    and persona.puntos[j][2] >= 0.40):
+                x1, y1, _ = persona.puntos[i]
+                x2, y2, _ = persona.puntos[j]
+                cv2.line(vista, (int(x1 * sx), int(y1 * sy)),
+                         (int(x2 * sx), int(y2 * sy)),
+                         (0, 0, 0), 4, cv2.LINE_AA)
+                cv2.line(vista, (int(x1 * sx), int(y1 * sy)),
+                         (int(x2 * sx), int(y2 * sy)),
+                         (220, 220, 0), 2, cv2.LINE_AA)
+        for x, y, confianza in persona.puntos:
+            if confianza >= 0.40:
+                cv2.circle(vista, (int(x * sx), int(y * sy)),
+                           3, (0, 240, 255), -1, cv2.LINE_AA)
 
     por_id = {p.track_id: p for p in personas if p.track_id is not None}
     for persona in personas:
