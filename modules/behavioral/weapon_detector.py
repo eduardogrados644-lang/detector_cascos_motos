@@ -82,6 +82,7 @@ def main(argv=None):
     n = 0
     avisos = 0
     capturas_guardadas = 0
+    capturas_manuales = 0
     candidatos_recientes = []  # (fotograma, clase, caja), solo para visualización.
     inicio_reloj = time.monotonic()
     es_video = isinstance(fuente_captura, str) and Path(fuente_captura).is_file()
@@ -221,7 +222,22 @@ def main(argv=None):
                         writer_video.write(vista)
                     if args.mostrar:
                         cv2.imshow("INTENCIONES - armas (experimental)", vista)
-                        if cv2.waitKey(1) & 0xFF in (27, ord("q")):
+                        tecla = cv2.waitKey(1) & 0xFF
+                        if tecla in (ord("f"), ord("F")):
+                            if capturas_manuales >= 20:
+                                print("[CAPTURA] Límite manual de 20 fotos por sesión.")
+                            else:
+                                carpeta_manual = carpeta / "capturas_manuales" / "armas"
+                                carpeta_manual.mkdir(parents=True, exist_ok=True)
+                                foto = carpeta_manual / (
+                                    datetime.now(timezone.utc).strftime(
+                                        "foto_%Y%m%d_%H%M%S_%f_")
+                                    + f"{n:06d}.jpg")
+                                if not cv2.imwrite(str(foto), vista):
+                                    raise OSError(f"No se pudo guardar captura manual: {foto}")
+                                capturas_manuales += 1
+                                print(f"[FOTO MANUAL] {foto}")
+                        if tecla in (27, ord("q")):
                             break
                 if args.max_fotogramas and n >= args.max_fotogramas:
                     break
@@ -235,6 +251,8 @@ def main(argv=None):
     print(f"Registro local: {csv_path}")
     if args.guardar_video:
         print(f"Video anotado: {video_path}")
+    if capturas_manuales:
+        print(f"Fotos manuales: {capturas_manuales}, en {carpeta / 'capturas_manuales' / 'armas'}")
     if args.guardar_capturas:
         print(f"Capturas de candidatos: {capturas_guardadas}, carpeta: {carpeta_capturas}")
 
