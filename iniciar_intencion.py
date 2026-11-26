@@ -215,10 +215,25 @@ def main(argv: list[str] | None = None) -> int:
             print("4. Observar brazos elevados y movimientos aparentes")
             print("5. Buscar posibles armas (requiere modelo de armas)")
             print("6. Clasificar videos con VideoMAE (solo archivos)")
+            print("7. Preparar modelo externo de armas (opcional, con permiso)")
             print("0. Salir sin iniciar análisis")
             opcion = input("Opción: ").strip()
             if opcion == "0":
                 return 0
+            if opcion == "7":
+                print("Origen propuesto: https://huggingface.co/cosgun99/gun-knife-yolo11n")
+                print("IMPORTANTE: un archivo .pt externo puede ejecutar codigo al cargarlo.")
+                print("Revisa procedencia, licencia y contenido antes de aceptarlo.")
+                permiso = input("Para descargar escribe ACEPTO (otro texto cancela): ").strip()
+                if permiso != "ACEPTO":
+                    print("Descarga cancelada; no se instalo ningun peso.")
+                    return 0
+                comando = [
+                    sys.executable, str(RAIZ / "scripts" / "descargar_modelo_armas.py"),
+                    "--acepto-modelo-tercero",
+                ]
+                print("Si falta huggingface_hub: python -m pip install huggingface_hub")
+                return subprocess.run(comando, cwd=RAIZ, check=False).returncode
             if opcion not in ("1", "2", "3", "4", "5", "6"):
                 raise ValueError("Opción no válida")
             modo = ("violencia" if opcion == "6" else "armas" if opcion == "5" else
