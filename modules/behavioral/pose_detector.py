@@ -299,6 +299,7 @@ def main() -> None:
     escritor_video = None
     max_capturas = 20  # Tope de privacidad/espacio por ejecución.
     capturas_guardadas = 0
+    capturas_manuales = 0
     carpeta_capturas = None
     avisos_activos = {}  # actor -> (tipo, objetivo, último fotograma)
     grabador_clips = GrabadorClips(destino.parent) if args.guardar_clips else None
@@ -457,7 +458,22 @@ def main() -> None:
                         grabador_clips.procesar(vista, tiempo_s, evento=bool(alertas))
                     if args.mostrar:
                         cv2.imshow("Analisis conductual experimental", vista)
-                        if cv2.waitKey(1) & 0xFF in (27, ord("q")):
+                        tecla = cv2.waitKey(1) & 0xFF
+                        if tecla in (ord("f"), ord("F")):
+                            if capturas_manuales >= 20:
+                                print("[CAPTURA] Límite manual de 20 fotos por sesión.")
+                            else:
+                                manual_dir = destino.parent / "capturas_manuales" / args.modo
+                                manual_dir.mkdir(parents=True, exist_ok=True)
+                                foto = manual_dir / (
+                                    datetime.now(timezone.utc).strftime(
+                                        "foto_%Y%m%d_%H%M%S_%f_")
+                                    + f"{fotograma:06d}.jpg")
+                                if not cv2.imwrite(str(foto), vista):
+                                    raise OSError(f"No se pudo guardar captura manual: {foto}")
+                                capturas_manuales += 1
+                                print(f"[FOTO MANUAL] {foto}")
+                        if tecla in (27, ord("q")):
                             break
                 if fotograma % 100 == 0:
                     print(f"Fotogramas procesados: {fotograma}")
@@ -477,6 +493,8 @@ def main() -> None:
     print(f"Fin. Modo {args.modo}; {fotograma} fotogramas. Archivo de eventos: {destino}")
     if grabador_clips is not None:
         print(f"Clips para revision: {grabador_clips.cantidad}, en {destino.parent}")
+    if capturas_manuales:
+        print(f"Fotos manuales: {capturas_manuales}, en {destino.parent / 'capturas_manuales' / args.modo}")
     if args.guardar_capturas:
         if carpeta_capturas is None:
             print("No hubo eventos nuevos para guardar capturas.")
