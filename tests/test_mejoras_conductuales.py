@@ -57,6 +57,31 @@ class PruebasMejorasConductuales(unittest.TestCase):
         self.assertIn("--alerta-sonora", cmd)
         self.assertIn("--sin-mejorar-iluminacion", cmd)
 
+    def test_instalacion_de_modelo_no_es_automatica(self):
+        with patch("builtins.input", side_effect=["7", "NO"]):
+            with patch("iniciar_intencion.subprocess.run") as ejecutar:
+                codigo = iniciar_intencion.main([])
+        self.assertEqual(codigo, 0)
+        ejecutar.assert_not_called()
+
+    def test_instalacion_requiere_acepto_explicito(self):
+        with patch("builtins.input", side_effect=["7", "ACEPTO"]):
+            with patch("iniciar_intencion.subprocess.run") as ejecutar:
+                ejecutar.return_value.returncode = 0
+                codigo = iniciar_intencion.main([])
+        self.assertEqual(codigo, 0)
+        comando = ejecutar.call_args.args[0]
+        self.assertIn("descargar_modelo_armas.py", " ".join(comando))
+        self.assertIn("--acepto-modelo-tercero", comando)
+
+    def test_luz_en_sombras_localizadas(self):
+        clara = np.full((120, 160, 3), 180, dtype=np.uint8)
+        clara[:, :80] = 20
+        resultado, aplicado = mejorar_iluminacion(clara)
+        self.assertTrue(aplicado)
+        self.assertEqual(resultado.shape, clara.shape)
+        self.assertGreaterEqual(float(resultado[:, :80].mean()), 20.0)
+
 
 if __name__ == "__main__":
     unittest.main()
