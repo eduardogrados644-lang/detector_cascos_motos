@@ -13,7 +13,8 @@ def reproducir_aviso():
             winsound.Beep(1100, 140)
             return True
         except (OSError, RuntimeError):
-            return bool(winsound.MessageBeep(winsound.MB_ICONEXCLAMATION))
+            winsound.MessageBeep(winsound.MB_ICONEXCLAMATION)
+            return True
     except (ImportError, OSError, RuntimeError):
         print("[AVISO] No se pudo reproducir sonido; revisar audio de Windows.")
         return False
