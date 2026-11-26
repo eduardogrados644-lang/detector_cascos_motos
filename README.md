@@ -358,3 +358,21 @@ Ambos requieren modelos externos cargables y revision humana. Consulta `docs/DAT
 ## Cámara integrada opcional para Cascos
 
 El modo VIAL permite seleccionar explícitamente la webcam integrada del PC con `Iniciar_Cascos.bat --integrada` o mediante el menú de `Iniciar_Cascos.bat`. Siguen disponibles USB externa, celular/tablet Android y archivos. No se activa automáticamente ni afecta las cámaras del apartado Intenciones. Consulta `docs/CAMARAS_CASCOS.md`.
+
+
+## Visibilidad y alertas del análisis conductual (experimental)
+
+El apartado conductual realza de forma opcional escenas oscuras, muestra cajas y
+etiquetas más diferenciables para personas, gestos dirigidos y objetos candidatos,
+y ofrece **dos tonos por aviso nuevo** de posibles agresiones y armas.
+No elimina sombras ni confirma intención, violencia o amenazas.
+Con la vista abierta, **F guarda una foto manual anotada** (máximo 20 por
+sesión); **Q/ESC** cierra. Usa `--sin-alerta-sonora` para silenciar y
+`--sin-mejorar-iluminacion` para desactivar el ajuste de luz.
+
+La opción **7** de `Iniciar_Intencion.bat` permite preparar voluntariamente
+pesos especializados de armas, después de revisar su origen y aceptar
+explícitamente la descarga. No se incluyen pesos externos en este repositorio.
+
+Instrucciones, rutas de capturas, precauciones y pruebas:
+[docs/MEJORAS_VISUALES_CONDUCTUAL.md](docs/MEJORAS_VISUALES_CONDUCTUAL.md).
