@@ -11,6 +11,8 @@ from math import isfinite
 from pathlib import Path
 
 from .weapon_events import ConfirmadorArmas, nombres_armas, solape
+from .lighting import mejorar_iluminacion
+from .alert_sound import reproducir_aviso
 from .person_tracker import fuente_video
 from modules.camera_recovery import recuperar_flujo
 
@@ -30,6 +32,10 @@ def main(argv=None):
     parser.add_argument("--guardar-capturas", action="store_true",
                         help="Guardar solo fotogramas con candidatos (hasta 20 por sesion)")
     parser.add_argument("--mostrar", action="store_true")
+    parser.add_argument("--alerta-sonora", action="store_true",
+                        help="Aviso audible ante un nuevo candidato")
+    parser.add_argument("--sin-mejorar-iluminacion", action="store_true",
+                        help="No ajustar escenas oscuras o con sombras")
     args = parser.parse_args(argv)
     if (not isfinite(args.conf) or not 0 < args.conf <= 1 or args.imgsz < 64
             or args.min_fotogramas < 1 or args.max_fotogramas < 0):
@@ -38,8 +44,17 @@ def main(argv=None):
     if not ruta.is_absolute():
         ruta = RAIZ / ruta
     if not ruta.is_file():
-        parser.error("Faltan pesos especializados de armas: " + str(ruta)
-                     + ". Lee docs/DETECCION_AGRESION_ARMAS.md")
+        parser.error(
+            "Faltan pesos especializados de armas: " + str(ruta)
+            + "\\nLa camara NO es la causa. Para instalar pesos externos:"
+            + "\\n1) Revisa procedencia y licencia en "
+              "https://huggingface.co/cosgun99/gun-knife-yolo11n"
+            + "\\n2) Si confias en ese origen, ejecuta:"
+            + "\\n   python -m pip install huggingface_hub"
+            + "\\n   python scripts/descargar_modelo_armas.py --acepto-modelo-tercero"
+            + "\\nO indica tus pesos especializados con --modelo-armas RUTA."
+            + "\\nNo uses pesos de cascos ni de YOLO COCO comun."
+        )
     import cv2
     from ultralytics import YOLO
     from modules.camera_sources import abrir_captura
@@ -67,6 +82,7 @@ def main(argv=None):
     n = 0
     avisos = 0
     capturas_guardadas = 0
+    candidatos_recientes = []  # (fotograma, clase, caja), solo para visualización.
     inicio_reloj = time.monotonic()
     es_video = isinstance(fuente_captura, str) and Path(fuente_captura).is_file()
     writer_video = None
@@ -91,10 +107,13 @@ def main(argv=None):
                     captura = captura_nueva
                     # Las confirmaciones anteriores no sobreviven al corte.
                     confirmador = ConfirmadorArmas(consecutivos=args.min_fotogramas)
+                    candidatos_recientes.clear()
                     print("[CAMARA] Detector de armas reanudado, historial reiniciado.")
                 n += 1
+                imagen_analisis, luz_adaptada = mejorar_iluminacion(
+                    imagen, not args.sin_mejorar_iluminacion)
                 pred = modelo.predict(
-                    imagen, imgsz=args.imgsz, conf=args.conf,
+                    imagen_analisis, imgsz=args.imgsz, conf=args.conf,
                     device="cpu", verbose=False,
                 )[0]
                 objetos = []
@@ -109,6 +128,14 @@ def main(argv=None):
                     objetos.append((clase, float(score), xyxy))
                 # No acumular rachas por clase: cada caja debe ser estable.
                 nuevos = confirmador.procesar_objetos(n, objetos)
+                candidatos_recientes = [
+                    c for c in candidatos_recientes if n - c[0] <= 45
+                ]
+                candidatos_recientes.extend(
+                    (n, c.clase, c.caja) for c in nuevos
+                )
+                if args.alerta_sonora and nuevos:
+                    reproducir_aviso()
                 if es_video:
                     pos_ms = captura.get(cv2.CAP_PROP_POS_MSEC)
                     instante_s = (pos_ms / 1000.0 if isfinite(pos_ms) and pos_ms > 0
@@ -131,23 +158,51 @@ def main(argv=None):
                 if (args.guardar_video or args.mostrar
                         or (args.guardar_capturas and nuevos
                             and capturas_guardadas < 20)):
-                    vista = imagen.copy()
+                    vista = imagen_analisis.copy()
+                    alto, ancho = vista.shape[:2]
+                    hay_aviso = bool(candidatos_recientes)
                     for clase, conf, caja in objetos:
                         x1, y1, x2, y2 = map(int, caja)
                         revisable = any(
-                            cand.clase == clase and solape(cand.caja, caja) > .95
-                            for cand in nuevos
+                            cl == clase and solape(ant_caja, caja) >= 0.25
+                            for _, cl, ant_caja in candidatos_recientes
                         )
-                        color = (40, 40, 235) if revisable else (0, 160, 255)
-                        cv2.rectangle(vista, (x1, y1), (x2, y2), color, 2)
+                        color = (0, 0, 255) if revisable else (0, 190, 255)
+                        grosor = 4 if revisable else 2
+                        cv2.rectangle(vista, (x1, y1), (x2, y2), (0, 0, 0), grosor + 2)
+                        cv2.rectangle(vista, (x1, y1), (x2, y2), color, grosor)
                         texto = (f"{TRADUCIR[clase]} {conf:.2f} "
                                  + ("REVISAR" if revisable else "OBSERVADO"))
-                        cv2.putText(vista, texto, (max(0,x1), max(20,y1-5)),
-                                    cv2.FONT_HERSHEY_SIMPLEX, 0.45, color, 1)
-                    alto, ancho = vista.shape[:2]
-                    cv2.putText(vista, "CANDIDATOS PARA REVISION - NO CONFIRMADO",
-                                (8, max(16, alto-12)), cv2.FONT_HERSHEY_SIMPLEX,
-                                0.47, (255,255,255), 1)
+                        fuente_letra = cv2.FONT_HERSHEY_SIMPLEX
+                        escala = 0.52
+                        (w, h), base = cv2.getTextSize(
+                            texto, fuente_letra, escala, 1)
+                        tx = max(3, min(max(3, ancho - w - 4), x1))
+                        ty = max(h + 9, min(alto - 4, y1 - 6))
+                        cv2.rectangle(vista, (tx - 2, ty - h - 4),
+                                      (tx + w + 3, ty + base + 3), color, -1)
+                        cv2.putText(vista, texto, (tx, ty),
+                                    fuente_letra, escala, (255, 255, 255),
+                                    1, cv2.LINE_AA)
+                    banner = ((0, 0, 205) if hay_aviso else (28, 28, 28))
+                    cv2.rectangle(vista, (0, 0), (ancho - 1, 30), banner, -1)
+                    aviso_texto = ("CANDIDATO DE OBJETO - REVISAR"
+                                   if hay_aviso else "SIN CANDIDATOS RECIENTES")
+                    cv2.putText(vista, aviso_texto, (8, 21),
+                                cv2.FONT_HERSHEY_SIMPLEX, 0.54,
+                                (255, 255, 255), 2 if hay_aviso else 1,
+                                cv2.LINE_AA)
+                    info = (f"Objetos: {len(objetos)} | clase gun/knife"
+                            + (" | luz ajustada" if luz_adaptada else ""))
+                    cv2.rectangle(vista, (0, max(0, alto - 40)),
+                                  (ancho - 1, alto - 1), (25, 25, 25), -1)
+                    cv2.putText(vista, info, (8, max(16, alto - 23)),
+                                cv2.FONT_HERSHEY_SIMPLEX, 0.43,
+                                (225, 225, 225), 1, cv2.LINE_AA)
+                    cv2.putText(vista, "Objeto potencial, NO amenaza confirmada",
+                                (8, max(28, alto - 7)),
+                                cv2.FONT_HERSHEY_SIMPLEX, 0.40,
+                                (255, 255, 255), 1, cv2.LINE_AA)
                     if (args.guardar_capturas and nuevos
                             and capturas_guardadas < 20):
                         carpeta_capturas.mkdir(parents=True, exist_ok=True)
