@@ -57,6 +57,23 @@ class PruebasMejorasConductuales(unittest.TestCase):
         self.assertIn("--alerta-sonora", cmd)
         self.assertIn("--sin-mejorar-iluminacion", cmd)
 
+    def test_descarga_detecta_modo_offline_sin_red(self):
+        import tempfile
+        import os
+        import sys
+        from pathlib import Path
+        from scripts import descargar_modelo_armas
+
+        with tempfile.TemporaryDirectory() as carpeta:
+            ruta = Path(carpeta) / "armas" / "best.pt"
+            with patch.object(descargar_modelo_armas, "DESTINO", ruta):
+                with patch.dict(os.environ, {"HF_HUB_OFFLINE": "1"}):
+                    with patch.object(sys, "argv", [
+                        "descargar_modelo_armas.py", "--acepto-modelo-tercero"
+                    ]):
+                        self.assertEqual(descargar_modelo_armas.main(), 2)
+            self.assertFalse(ruta.exists())
+
     def test_instalacion_de_modelo_no_es_automatica(self):
         with patch("builtins.input", side_effect=["7", "NO"]):
             with patch("iniciar_intencion.subprocess.run") as ejecutar:
