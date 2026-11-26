@@ -46,14 +46,14 @@ def main(argv=None):
     if not ruta.is_file():
         parser.error(
             "Faltan pesos especializados de armas: " + str(ruta)
-            + "\\nLa camara NO es la causa. Para instalar pesos externos:"
-            + "\\n1) Revisa procedencia y licencia en "
+            + "\nLa camara NO es la causa. Para instalar pesos externos:"
+            + "\n1) Revisa procedencia y licencia en "
               "https://huggingface.co/cosgun99/gun-knife-yolo11n"
-            + "\\n2) Si confias en ese origen, ejecuta:"
-            + "\\n   python -m pip install huggingface_hub"
-            + "\\n   python scripts/descargar_modelo_armas.py --acepto-modelo-tercero"
-            + "\\nO indica tus pesos especializados con --modelo-armas RUTA."
-            + "\\nNo uses pesos de cascos ni de YOLO COCO comun."
+            + "\n2) Si confias en ese origen, ejecuta:"
+            + "\n   python -m pip install huggingface_hub"
+            + "\n   python scripts/descargar_modelo_armas.py --acepto-modelo-tercero"
+            + "\nO indica tus pesos especializados con --modelo-armas RUTA."
+            + "\nNo uses pesos de cascos ni de YOLO COCO comun."
         )
     import cv2
     from ultralytics import YOLO
