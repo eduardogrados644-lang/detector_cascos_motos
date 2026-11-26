@@ -42,6 +42,7 @@ def construir_comando_demo(
     conf: float | None = None,
     guardar_clips: bool = False,
     alerta_sonora: bool = False,
+    mejorar_luz: bool = True,
 ) -> list[str]:
     """Sólo lanza la demostración conductual, nunca el detector de cascos."""
     if not fuente.strip() or max_fotogramas < 0:
@@ -76,9 +77,9 @@ def construir_comando_demo(
             raise ValueError("Los clips de eventos requieren --demo-agresiones")
         cmd.append("--guardar-clips")
     if alerta_sonora:
-        if modo != "agresiones":
-            raise ValueError("La alerta sonora requiere --demo-agresiones")
         cmd.append("--alerta-sonora")
+    if not mejorar_luz:
+        cmd.append("--sin-mejorar-iluminacion")
     if max_fotogramas:
         cmd.extend(["--max-fotogramas", str(max_fotogramas)])
     if imgsz is not None:
@@ -94,6 +95,8 @@ def construir_comando_armas(
     max_fotogramas: int = 0, imgsz: int | None = None,
     conf: float | None = None, modelo: str | None = None,
     guardar_capturas: bool = False,
+    alerta_sonora: bool = False,
+    mejorar_luz: bool = True,
 ) -> list[str]:
     """Lanza el detector especializado de objetos, nunca los pesos viales."""
     if not fuente.strip() or max_fotogramas < 0:
@@ -107,6 +110,10 @@ def construir_comando_armas(
            "--fuente", validar_fuente(fuente)]
     if guardar_capturas:
         cmd.append("--guardar-capturas")
+    if alerta_sonora:
+        cmd.append("--alerta-sonora")
+    if not mejorar_luz:
+        cmd.append("--sin-mejorar-iluminacion")
     if mostrar:
         cmd.append("--mostrar")
     if guardar_video:
@@ -170,7 +177,11 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--guardar-clips", action="store_true",
                         help="Clips cortos por aviso (solo modo agresiones)")
     parser.add_argument("--alerta-sonora", action="store_true",
-                        help="Aviso de Windows por evento candidato (solo modo agresiones)")
+                        help="Aviso audible por evento candidato; por defecto en armas y agresiones")
+    parser.add_argument("--sin-alerta-sonora", action="store_true",
+                        help="Desactivar sonido, incluso en armas y agresiones")
+    parser.add_argument("--sin-mejorar-iluminacion", action="store_true",
+                        help="No realzar automáticamente escenas oscuras o con sombras")
     parser.add_argument(
         "--filtro-brazos", action="store_true",
         help="Filtro experimental de saltos de muñeca, sólo en demo-brazos",
@@ -185,6 +196,8 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--device", choices=("cpu", "cuda"), default="cpu")
     parser.add_argument("--estado", action="store_true")
     args = parser.parse_args(argv)
+    if args.alerta_sonora and args.sin_alerta_sonora:
+        parser.error("No combines --alerta-sonora y --sin-alerta-sonora")
     mostrar_estado()
     if args.estado:
         return 0
@@ -226,8 +239,8 @@ def main(argv: list[str] | None = None) -> int:
                 print("Analizando video temporal experimental, NO agresion confirmada:", args.fuente)
                 return subprocess.run(cmd, cwd=RAIZ, check=False).returncode
             if modo == "armas":
-                if (args.filtro_brazos or args.guardar_clips or args.alerta_sonora):
-                    raise ValueError("Modo armas no permite clips, filtro brazos ni sonido de agresiones")
+                if args.filtro_brazos or args.guardar_clips:
+                    raise ValueError("Modo armas no permite clips ni filtro de brazos")
                 fuente = seleccionar_fuente(args.fuente, args.usb, args.wifi)
                 if fuente is None:
                     return 0
@@ -235,7 +248,9 @@ def main(argv: list[str] | None = None) -> int:
                     fuente, mostrar=not args.sin_mostrar,
                     guardar_video=args.guardar_video, max_fotogramas=args.max_fotogramas,
                     imgsz=args.imgsz, conf=args.conf, modelo=args.modelo_armas,
-                    guardar_capturas=args.guardar_capturas)
+                    guardar_capturas=args.guardar_capturas,
+                    alerta_sonora=(args.alerta_sonora or not args.sin_alerta_sonora),
+                    mejorar_luz=not args.sin_mejorar_iluminacion)
                 print("Deteccion de posibles objetos para revision, NO amenaza confirmada:", fuente)
                 return subprocess.run(cmd, cwd=RAIZ, check=False).returncode
             fuente = seleccionar_fuente(args.fuente, args.usb, args.wifi)
@@ -248,7 +263,9 @@ def main(argv: list[str] | None = None) -> int:
                 guardar_video=args.guardar_video,
                 guardar_capturas=args.guardar_capturas,
                 guardar_clips=args.guardar_clips,
-                alerta_sonora=args.alerta_sonora,
+                alerta_sonora=(args.alerta_sonora or
+                                (modo == "agresiones" and not args.sin_alerta_sonora)),
+                mejorar_luz=not args.sin_mejorar_iluminacion,
                 filtro_brazos=args.filtro_brazos,
                 max_fotogramas=args.max_fotogramas,
                 modo=modo,
